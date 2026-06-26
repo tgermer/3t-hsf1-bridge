@@ -1,5 +1,6 @@
 #include <Arduino.h>
 
+#include "HomeAssistantBridge.h"
 #include "LedController.h"
 #include "Logger.h"
 #include "MQTTManager.h"
@@ -12,6 +13,7 @@ RemoteController remote;
 PositionTracker position;
 WiFiManager wifi;
 MQTTManager mqtt;
+HomeAssistantBridge bridge(mqtt, remote, position, leds);
 
 void setup()
 {
@@ -24,12 +26,14 @@ void setup()
 
   wifi.begin();
   mqtt.begin();
+  bridge.begin();
 }
 
 void loop()
 {
   wifi.update();
   mqtt.update();
+  bridge.update();
   position.update();
 
   leds.setWifi(wifi.isConnected());
