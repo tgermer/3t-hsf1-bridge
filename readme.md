@@ -1,5 +1,9 @@
 # 3T HSF1 Bridge
 
+![HSF1](docs/images/front.jpeg)
+
+See the documentation in the `docs` folder.
+
 ESP32-based Home Assistant bridge for controlling a 3T Components awning motor by electronically pressing the buttons of an original HSF1 remote.
 
 ## Why this project exists
@@ -66,3 +70,12 @@ This project does not connect to mains voltage or the awning motor directly. It 
 ## Development status
 
 Work in progress.
+
+## Project Status
+
+- ✅ Hardware reverse engineered
+- ✅ HSF1 button contacts identified
+- ⏳ ESP32 firmware
+- ⏳ Home Assistant integration
+- ⏳ Position tracking
+- ⏳ Enclosure
