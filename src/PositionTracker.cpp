@@ -1,0 +1,120 @@
+#include "PositionTracker.h"
+
+#include "Constants.h"
+#include "Logger.h"
+
+void PositionTracker::begin()
+{
+    position = 0;
+    direction = MovementDirection::Idle;
+    lastUpdateMs = millis();
+
+    Logger::info("Position tracker initialized");
+}
+
+void PositionTracker::startOpening()
+{
+    update();
+
+    direction = MovementDirection::Opening;
+    lastUpdateMs = millis();
+
+    Logger::info("Position tracking: opening");
+}
+
+void PositionTracker::startClosing()
+{
+    update();
+
+    direction = MovementDirection::Closing;
+    lastUpdateMs = millis();
+
+    Logger::info("Position tracking: closing");
+}
+
+void PositionTracker::stop()
+{
+    update();
+
+    direction = MovementDirection::Idle;
+
+    Logger::info("Position tracking stopped at " + String(position) + "%");
+}
+
+void PositionTracker::setFullyOpen()
+{
+    position = 100;
+    direction = MovementDirection::Idle;
+
+    Logger::info("Position set to fully open");
+}
+
+void PositionTracker::setFullyClosed()
+{
+    position = 0;
+    direction = MovementDirection::Idle;
+
+    Logger::info("Position set to fully closed");
+}
+
+void PositionTracker::update()
+{
+    if (direction == MovementDirection::Idle)
+    {
+        return;
+    }
+
+    unsigned long now = millis();
+    unsigned long elapsedMs = now - lastUpdateMs;
+
+    if (elapsedMs == 0)
+    {
+        return;
+    }
+
+    applyMovement(elapsedMs);
+    lastUpdateMs = now;
+}
+
+int PositionTracker::getPosition() const
+{
+    return position;
+}
+
+MovementDirection PositionTracker::getDirection() const
+{
+    return direction;
+}
+
+bool PositionTracker::isMoving() const
+{
+    return direction != MovementDirection::Idle;
+}
+
+void PositionTracker::applyMovement(unsigned long elapsedMs)
+{
+    if (direction == MovementDirection::Opening)
+    {
+        float delta = (elapsedMs * 100.0f) / OPEN_TIME_MS;
+        position += round(delta);
+
+        if (position >= 100)
+        {
+            position = 100;
+            direction = MovementDirection::Idle;
+            Logger::info("Position reached fully open");
+        }
+    }
+    else if (direction == MovementDirection::Closing)
+    {
+        float delta = (elapsedMs * 100.0f) / CLOSE_TIME_MS;
+        position -= round(delta);
+
+        if (position <= 0)
+        {
+            position = 0;
+            direction = MovementDirection::Idle;
+            Logger::info("Position reached fully closed");
+        }
+    }
+}
