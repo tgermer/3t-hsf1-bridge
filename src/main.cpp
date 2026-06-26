@@ -1,38 +1,31 @@
 #include <Arduino.h>
-#include "RemoteController.h"
-#include "Logger.h"
 
+#include "LedController.h"
+#include "Logger.h"
+#include "PositionTracker.h"
+#include "RemoteController.h"
+#include "WiFiManager.h"
+
+LedController leds;
 RemoteController remote;
+PositionTracker position;
+WiFiManager wifi;
 
 void setup()
 {
   Logger::begin();
   Logger::info("3T HSF1 Bridge starting");
 
-  // For testing
-  Logger::info("LED controller initialized");
-  Logger::info("Remote controller initialized");
-  Logger::debug("Running startup self-test");
-
-  delay(1000);
-
-  Serial.println("3T HSF1 Bridge starting");
+  leds.begin();
   remote.begin();
-
-  Serial.println("Test: Open");
-  remote.pressOpen();
-
-  delay(1000);
-
-  Serial.println("Test: Stop");
-  remote.pressStop();
-
-  delay(1000);
-
-  Serial.println("Test: Close");
-  remote.pressClose();
+  position.begin();
+  wifi.begin();
 }
 
 void loop()
 {
+  wifi.update();
+  position.update();
+
+  leds.setWifi(wifi.isConnected());
 }
