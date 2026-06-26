@@ -1,18 +1,30 @@
 #include <Arduino.h>
+#include "RemoteController.h"
 
-// put function declarations here:
-int myFunction(int, int);
+RemoteController remote;
 
-void setup() {
-  // put your setup code here, to run once:
-  int result = myFunction(2, 3);
+void setup()
+{
+  Serial.begin(115200);
+  delay(1000);
+
+  Serial.println("3T HSF1 Bridge starting");
+  remote.begin();
+
+  Serial.println("Test: Open");
+  remote.pressOpen();
+
+  delay(1000);
+
+  Serial.println("Test: Stop");
+  remote.pressStop();
+
+  delay(1000);
+
+  Serial.println("Test: Close");
+  remote.pressClose();
 }
 
-void loop() {
-  // put your main code here, to run repeatedly:
-}
-
-// put function definitions here:
-int myFunction(int x, int y) {
-  return x + y;
+void loop()
+{
 }
