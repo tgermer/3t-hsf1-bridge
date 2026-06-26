@@ -1,9 +1,43 @@
 #pragma once
 
-constexpr auto WIFI_SSID = "";
-constexpr auto WIFI_PASSWORD = "";
+#include <Arduino.h>
 
-constexpr auto MQTT_HOST = "";
-constexpr auto MQTT_PORT = 1883;
-constexpr auto MQTT_USERNAME = "";
-constexpr auto MQTT_PASSWORD = "";
+namespace Config
+{
+    namespace WiFi
+    {
+        constexpr auto SSID = "";
+        constexpr auto Password = "";
+    }
+
+    namespace MQTT
+    {
+        constexpr auto Host = "";
+        constexpr uint16_t Port = 1883;
+        constexpr auto Username = "";
+        constexpr auto Password = "";
+    }
+
+    namespace Device
+    {
+        constexpr auto Name = "3T HSF1 Bridge";
+        constexpr auto Version = "0.1.0";
+    }
+
+    namespace Remote
+    {
+        constexpr uint32_t ButtonPressMs = 300;
+        constexpr uint32_t LongButtonPressMs = 2000;
+    }
+
+    namespace Awning
+    {
+        constexpr uint32_t OpenTimeMs = 26300;
+        constexpr uint32_t CloseTimeMs = 27000;
+    }
+
+    namespace WiFiManager
+    {
+        constexpr uint32_t ReconnectIntervalMs = 10000;
+    }
+}
