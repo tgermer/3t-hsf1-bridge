@@ -10,6 +10,7 @@ public:
     MQTTManager();
 
     void begin();
+    void connect();
     void update();
 
     bool isConnected() const;

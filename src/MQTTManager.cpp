@@ -15,6 +15,11 @@ void MQTTManager::begin()
 
     device.setName("3T HSF1 Bridge");
     device.setSoftwareVersion("0.1.0");
+}
+
+void MQTTManager::connect()
+{
+    Logger::info("Connecting MQTT");
 
     mqtt.begin(
         MQTT_HOST,

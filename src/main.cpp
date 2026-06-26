@@ -27,6 +27,7 @@ void setup()
   wifi.begin();
   mqtt.begin();
   bridge.begin();
+  mqtt.connect();
 }
 
 void loop()
