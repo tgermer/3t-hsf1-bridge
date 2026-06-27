@@ -59,6 +59,9 @@ void MQTTManager::connect()
         String(Config::MQTT::Port));
 
     // Initializes the MQTT connection and starts automatic reconnect handling.
+    mqtt.setBufferSize(512);
+    mqtt.setKeepAlive(60);
+
     mqtt.begin(
         Config::MQTT::Host,
         Config::MQTT::Port,
@@ -78,13 +81,6 @@ void MQTTManager::update()
     }
 
     mqtt.loop();
-
-    // unsigned long now = millis();
-    // if (now - lastLoopLogMs >= 5000)
-    // {
-    //     lastLoopLogMs = now;
-    //     Logger::info("MQTT loop running, connected=" + String(isConnected() ? "true" : "false"));
-    // }
 
     bool connected = isConnected();
 
