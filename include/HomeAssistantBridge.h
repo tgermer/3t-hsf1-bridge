@@ -26,6 +26,7 @@ private:
     LedController &leds;
 
     HACover awningCover;
+    HAButton savedPositionButton;
 
     int lastPublishedPosition = -1;
     unsigned long lastPositionPublishMs = 0;
@@ -34,9 +35,11 @@ private:
 
     static HomeAssistantBridge *instance;
     static void onCoverCommand(HACover::CoverCommand cmd, HACover *sender);
+    static void onSavedPositionCommand(HAButton *sender);
 
     void publishPositionIfNeeded();
     void publishCoverState();
 
     void handleCoverCommand(HACover::CoverCommand cmd);
+    void handleSavedPositionCommand();
 };
