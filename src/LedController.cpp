@@ -19,19 +19,16 @@ void LedController::begin()
 
 void LedController::setWifi(bool connected)
 {
-    wifiState = connected;
     digitalWrite(Pins::Led::WiFi, connected);
 }
 
 void LedController::setMqtt(bool connected)
 {
-    mqttState = connected;
     digitalWrite(Pins::Led::MQTT, connected);
 }
 
 void LedController::setError(bool error)
 {
-    errorState = error;
     digitalWrite(Pins::Led::Error, error);
 }
 

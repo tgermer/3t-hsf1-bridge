@@ -10,9 +10,4 @@ public:
     void setError(bool error);
 
     void flashSend();
-
-private:
-    bool wifiState = false;
-    bool mqttState = false;
-    bool errorState = false;
 };
