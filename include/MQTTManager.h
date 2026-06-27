@@ -21,8 +21,6 @@ public:
 private:
     WiFiClient wifiClient;
 
-    byte mac[6] = {0xA5, 0x5C, 0xDB, 0xDF, 0x7B, 0x37};
-
     HADevice device;
     HAMqtt mqtt;
 

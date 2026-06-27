@@ -4,7 +4,7 @@
 #include "Logger.h"
 
 MQTTManager::MQTTManager()
-    : device(mac, sizeof(mac)),
+    : device(Config::Device::MacAddress, sizeof(Config::Device::MacAddress)),
       mqtt(wifiClient, device)
 {
 }
@@ -19,8 +19,13 @@ void MQTTManager::begin()
 
 void MQTTManager::connect()
 {
-    Logger::info("Connecting MQTT");
+    Logger::info(
+        "Connecting MQTT broker " +
+        String(Config::MQTT::Host) +
+        ":" +
+        String(Config::MQTT::Port));
 
+    // Initializes the MQTT connection and starts automatic reconnect handling.
     mqtt.begin(
         Config::MQTT::Host,
         Config::MQTT::Port,
