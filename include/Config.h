@@ -28,7 +28,7 @@ namespace Config
     namespace Remote
     {
         constexpr uint32_t ButtonPressMs = 300;
-        constexpr uint32_t LongButtonPressMs = 2000;
+        constexpr uint32_t LongButtonPressMs = 3000;
     }
 
     namespace Awning
