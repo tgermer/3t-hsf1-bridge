@@ -15,8 +15,8 @@ namespace Config
     {
         constexpr auto Host = "10.20.10.11";
         constexpr uint16_t Port = 1883;
-        constexpr auto Username = "esp32";
-        constexpr auto Password = "esp32Markise";
+        constexpr auto Username = "3t-hsf1-bridge";
+        constexpr auto Password = "3t-hsf1-bridge-2026";
     }
 
     namespace Device
