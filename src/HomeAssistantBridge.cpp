@@ -14,7 +14,8 @@ HomeAssistantBridge::HomeAssistantBridge(
       position(position),
       leds(leds),
       awningCover("markise", HACover::PositionFeature),
-      savedPositionButton("markise_saved_position")
+      savedPositionButton("markise_saved_position"),
+      targetPositionNumber("markise_target_position")
 {
 }
 
@@ -36,6 +37,15 @@ void HomeAssistantBridge::begin()
     savedPositionButton.setIcon("mdi:star-outline");
     savedPositionButton.onCommand(onSavedPositionCommand);
 
+    targetPositionNumber.setName("Zielposition");
+    targetPositionNumber.setIcon("mdi:arrow-expand-vertical");
+    targetPositionNumber.setMin(0);
+    targetPositionNumber.setMax(100);
+    targetPositionNumber.setStep(1);
+    targetPositionNumber.setMode(HANumber::ModeSlider);
+    targetPositionNumber.onCommand(onTargetPositionCommand);
+    targetPositionNumber.setState(position.getPosition());
+
     lastPublishedPosition = position.getPosition();
 
     Logger::info("Home Assistant cover registered");
@@ -43,8 +53,8 @@ void HomeAssistantBridge::begin()
 
 void HomeAssistantBridge::update()
 {
-    // Temporarily disabled to isolate the MQTT keepalive disconnect issue.
-    // Re-enable publishPositionIfNeeded() after the MQTT connection is stable.
+    publishPositionIfNeeded();
+    updateTargetPositionMovement();
 }
 
 void HomeAssistantBridge::publishPositionIfNeeded()
@@ -100,6 +110,44 @@ void HomeAssistantBridge::publishCoverState()
     }
 }
 
+void HomeAssistantBridge::updateTargetPositionMovement()
+{
+    if (!targetPositionActive)
+    {
+        return;
+    }
+
+    int currentPosition = constrain(position.getPosition(), 0, 100);
+
+    bool reachedTarget = abs(currentPosition - targetPosition) <= TargetPositionTolerance;
+
+    if (position.getDirection() == MovementDirection::Opening && currentPosition >= targetPosition)
+    {
+        reachedTarget = true;
+    }
+    else if (position.getDirection() == MovementDirection::Closing && currentPosition <= targetPosition)
+    {
+        reachedTarget = true;
+    }
+
+    if (!reachedTarget)
+    {
+        return;
+    }
+
+    Logger::info("Target position reached: " + String(targetPosition) + "%");
+
+    leds.flashSend();
+    remote.pressStop();
+    position.stop();
+
+    targetPositionActive = false;
+
+    awningCover.setPosition(targetPosition, true);
+    awningCover.setState(HACover::StateStopped);
+    targetPositionNumber.setState(targetPosition);
+}
+
 void HomeAssistantBridge::onCoverCommand(HACover::CoverCommand cmd, HACover *sender)
 {
     if (instance == nullptr)
@@ -122,11 +170,23 @@ void HomeAssistantBridge::onSavedPositionCommand(HAButton *sender)
     instance->handleSavedPositionCommand();
 }
 
+void HomeAssistantBridge::onTargetPositionCommand(HANumeric number, HANumber *sender)
+{
+    if (instance == nullptr)
+    {
+        Logger::error("HomeAssistantBridge instance is null");
+        return;
+    }
+
+    instance->handleTargetPositionCommand(number);
+}
+
 void HomeAssistantBridge::handleCoverCommand(HACover::CoverCommand cmd)
 {
     if (cmd == HACover::CommandOpen)
     {
         Logger::info("Home Assistant command: Open");
+        targetPositionActive = false;
 
         leds.flashSend();
         remote.pressOpen();
@@ -137,6 +197,7 @@ void HomeAssistantBridge::handleCoverCommand(HACover::CoverCommand cmd)
     else if (cmd == HACover::CommandClose)
     {
         Logger::info("Home Assistant command: Close");
+        targetPositionActive = false;
 
         leds.flashSend();
         remote.pressClose();
@@ -147,6 +208,7 @@ void HomeAssistantBridge::handleCoverCommand(HACover::CoverCommand cmd)
     else if (cmd == HACover::CommandStop)
     {
         Logger::info("Home Assistant command: Stop");
+        targetPositionActive = false;
 
         leds.flashSend();
         remote.pressStop();
@@ -159,9 +221,57 @@ void HomeAssistantBridge::handleCoverCommand(HACover::CoverCommand cmd)
 void HomeAssistantBridge::handleSavedPositionCommand()
 {
     Logger::info("Home Assistant command: Saved position");
+    targetPositionActive = false;
 
     leds.flashSend();
     remote.pressFavoritePosition();
 
     awningCover.setState(HACover::StateStopped);
+}
+
+void HomeAssistantBridge::handleTargetPositionCommand(HANumeric number)
+{
+    if (!number.isSet())
+    {
+        Logger::warning("Home Assistant command: Target position reset ignored");
+        return;
+    }
+
+    int requestedPosition = constrain(number.toInt16(), 0, 100);
+    int currentPosition = constrain(position.getPosition(), 0, 100);
+
+    Logger::info(
+        "Home Assistant command: Target position " +
+        String(requestedPosition) +
+        "% from " +
+        String(currentPosition) +
+        "%");
+
+    targetPositionNumber.setState(requestedPosition);
+
+    if (abs(currentPosition - requestedPosition) <= TargetPositionTolerance)
+    {
+        targetPositionActive = false;
+        awningCover.setPosition(requestedPosition, true);
+        awningCover.setState(HACover::StateStopped);
+        return;
+    }
+
+    leds.flashSend();
+
+    targetPosition = requestedPosition;
+    targetPositionActive = true;
+
+    if (requestedPosition > currentPosition)
+    {
+        remote.pressOpen();
+        position.startOpening();
+        awningCover.setState(HACover::StateOpening);
+    }
+    else
+    {
+        remote.pressClose();
+        position.startClosing();
+        awningCover.setState(HACover::StateClosing);
+    }
 }
