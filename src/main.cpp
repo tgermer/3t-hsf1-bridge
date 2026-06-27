@@ -12,5 +12,5 @@ void setup()
 void loop()
 {
   app.update();
-  delay(5);
+  delay(100);
 }
