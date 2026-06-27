@@ -1,4 +1,4 @@
-# HomeAssistantBridge
+# HomeAssistant Bridge
 
 ## Responsibility
 

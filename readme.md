@@ -86,3 +86,7 @@ Work in progress.
 - ⏳ Home Assistant integration
 - ⏳ Position tracking
 - ⏳ Enclosure
+
+## Documentation
+
+See the complete documentation in the [docs](docs/README.md) folder.
