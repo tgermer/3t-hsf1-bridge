@@ -8,6 +8,7 @@
 void WiFiManager::begin()
 {
     WiFi.mode(WIFI_STA);
+    WiFi.setSleep(false);
     startConnection();
 }
 
