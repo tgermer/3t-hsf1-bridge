@@ -5,33 +5,33 @@
 
 void RemoteController::begin()
 {
-    pinMode(PIN_REMOTE_OPEN, OUTPUT);
-    pinMode(PIN_REMOTE_STOP, OUTPUT);
-    pinMode(PIN_REMOTE_CLOSE, OUTPUT);
+    pinMode(Pins::Remote::Open, OUTPUT);
+    pinMode(Pins::Remote::Stop, OUTPUT);
+    pinMode(Pins::Remote::Close, OUTPUT);
 
-    digitalWrite(PIN_REMOTE_OPEN, LOW);
-    digitalWrite(PIN_REMOTE_STOP, LOW);
-    digitalWrite(PIN_REMOTE_CLOSE, LOW);
+    digitalWrite(Pins::Remote::Open, LOW);
+    digitalWrite(Pins::Remote::Stop, LOW);
+    digitalWrite(Pins::Remote::Close, LOW);
 }
 
 void RemoteController::pressOpen()
 {
-    pressButton(PIN_REMOTE_OPEN, Config::Remote::ButtonPressMs);
+    pressButton(Pins::Remote::Open, Config::Remote::ButtonPressMs);
 }
 
 void RemoteController::pressStop()
 {
-    pressButton(PIN_REMOTE_STOP, Config::Remote::ButtonPressMs);
+    pressButton(Pins::Remote::Stop, Config::Remote::ButtonPressMs);
 }
 
 void RemoteController::pressClose()
 {
-    pressButton(PIN_REMOTE_CLOSE, Config::Remote::ButtonPressMs);
+    pressButton(Pins::Remote::Close, Config::Remote::ButtonPressMs);
 }
 
 void RemoteController::pressFavoritePosition()
 {
-    pressButton(PIN_REMOTE_STOP, Config::Remote::LongButtonPressMs);
+    pressButton(Pins::Remote::Stop, Config::Remote::LongButtonPressMs);
 }
 
 void RemoteController::pressButton(uint8_t pin, uint32_t durationMs)

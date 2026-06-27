@@ -6,38 +6,38 @@
 
 void LedController::begin()
 {
-    pinMode(PIN_LED_WIFI, OUTPUT);
-    pinMode(PIN_LED_MQTT, OUTPUT);
-    pinMode(PIN_LED_SEND, OUTPUT);
-    pinMode(PIN_LED_ERROR, OUTPUT);
+    pinMode(Pins::Led::WiFi, OUTPUT);
+    pinMode(Pins::Led::MQTT, OUTPUT);
+    pinMode(Pins::Led::Send, OUTPUT);
+    pinMode(Pins::Led::Error, OUTPUT);
 
-    digitalWrite(PIN_LED_WIFI, LOW);
-    digitalWrite(PIN_LED_MQTT, LOW);
-    digitalWrite(PIN_LED_SEND, LOW);
-    digitalWrite(PIN_LED_ERROR, LOW);
+    digitalWrite(Pins::Led::WiFi, LOW);
+    digitalWrite(Pins::Led::MQTT, LOW);
+    digitalWrite(Pins::Led::Send, LOW);
+    digitalWrite(Pins::Led::Error, LOW);
 }
 
 void LedController::setWifi(bool connected)
 {
     wifiState = connected;
-    digitalWrite(PIN_LED_WIFI, connected);
+    digitalWrite(Pins::Led::WiFi, connected);
 }
 
 void LedController::setMqtt(bool connected)
 {
     mqttState = connected;
-    digitalWrite(PIN_LED_MQTT, connected);
+    digitalWrite(Pins::Led::MQTT, connected);
 }
 
 void LedController::setError(bool error)
 {
     errorState = error;
-    digitalWrite(PIN_LED_ERROR, error);
+    digitalWrite(Pins::Led::Error, error);
 }
 
 void LedController::flashSend()
 {
-    digitalWrite(PIN_LED_SEND, HIGH);
+    digitalWrite(Pins::Led::Send, HIGH);
     delay(100);
-    digitalWrite(PIN_LED_SEND, LOW);
+    digitalWrite(Pins::Led::Send, LOW);
 }
