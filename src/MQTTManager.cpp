@@ -13,8 +13,8 @@ void MQTTManager::begin()
 {
     Logger::info("Initializing MQTT manager");
 
-    device.setName("3T HSF1 Bridge");
-    device.setSoftwareVersion("0.1.0");
+    device.setName(Config::Device::Name);
+    device.setSoftwareVersion(Config::Device::Version);
 }
 
 void MQTTManager::connect()
@@ -22,10 +22,10 @@ void MQTTManager::connect()
     Logger::info("Connecting MQTT");
 
     mqtt.begin(
-        MQTT_HOST,
-        MQTT_PORT,
-        MQTT_USERNAME,
-        MQTT_PASSWORD);
+        Config::MQTT::Host,
+        Config::MQTT::Port,
+        Config::MQTT::Username,
+        Config::MQTT::Password);
 
     Logger::info("MQTT begin called");
 }

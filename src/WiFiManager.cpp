@@ -5,8 +5,6 @@
 #include "Config.h"
 #include "Logger.h"
 
-constexpr unsigned long WIFI_RECONNECT_INTERVAL_MS = 10000;
-
 void WiFiManager::begin()
 {
     WiFi.mode(WIFI_STA);
@@ -42,7 +40,7 @@ String WiFiManager::getIpAddress() const
 
 String WiFiManager::getSSID() const
 {
-    return WIFI_SSID;
+    return Config::WiFi::SSID;
 }
 
 WiFiConnectionState WiFiManager::getState() const
@@ -52,12 +50,12 @@ WiFiConnectionState WiFiManager::getState() const
 
 void WiFiManager::startConnection()
 {
-    Logger::info("Connecting to WiFi: " + String(WIFI_SSID));
+    Logger::info("Connecting to WiFi: " + String(Config::WiFi::SSID));
 
     state = WiFiConnectionState::Connecting;
     lastReconnectAttemptMs = millis();
 
-    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    WiFi.begin(Config::WiFi::SSID, Config::WiFi::Password);
 }
 
 void WiFiManager::handleConnected()
@@ -80,7 +78,7 @@ void WiFiManager::handleDisconnected()
 
     unsigned long now = millis();
 
-    if (now - lastReconnectAttemptMs >= WIFI_RECONNECT_INTERVAL_MS)
+    if (now - lastReconnectAttemptMs >= Config::WiFi::ReconnectIntervalMs)
     {
         Logger::info("Retrying WiFi connection");
         startConnection();

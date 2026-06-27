@@ -1,6 +1,6 @@
 #include "PositionTracker.h"
+#include "Config.h"
 
-#include "Constants.h"
 #include "Logger.h"
 
 void PositionTracker::begin()
@@ -95,7 +95,7 @@ void PositionTracker::applyMovement(unsigned long elapsedMs)
 {
     if (direction == MovementDirection::Opening)
     {
-        float delta = (elapsedMs * 100.0f) / OPEN_TIME_MS;
+        float delta = (elapsedMs * 100.0f) / Config::Awning::OpenTimeMs;
         position += round(delta);
 
         if (position >= 100)
@@ -107,7 +107,7 @@ void PositionTracker::applyMovement(unsigned long elapsedMs)
     }
     else if (direction == MovementDirection::Closing)
     {
-        float delta = (elapsedMs * 100.0f) / CLOSE_TIME_MS;
+        float delta = (elapsedMs * 100.0f) / Config::Awning::CloseTimeMs;
         position -= round(delta);
 
         if (position <= 0)

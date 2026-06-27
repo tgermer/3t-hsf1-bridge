@@ -1,6 +1,7 @@
 #include "RemoteController.h"
 #include "Pins.h"
-#include "Constants.h"
+
+#include "Config.h"
 
 void RemoteController::begin()
 {
@@ -15,22 +16,22 @@ void RemoteController::begin()
 
 void RemoteController::pressOpen()
 {
-    pressButton(PIN_REMOTE_OPEN, BUTTON_PRESS_MS);
+    pressButton(PIN_REMOTE_OPEN, Config::Remote::ButtonPressMs);
 }
 
 void RemoteController::pressStop()
 {
-    pressButton(PIN_REMOTE_STOP, BUTTON_PRESS_MS);
+    pressButton(PIN_REMOTE_STOP, Config::Remote::ButtonPressMs);
 }
 
 void RemoteController::pressClose()
 {
-    pressButton(PIN_REMOTE_CLOSE, BUTTON_PRESS_MS);
+    pressButton(PIN_REMOTE_CLOSE, Config::Remote::ButtonPressMs);
 }
 
 void RemoteController::pressFavoritePosition()
 {
-    pressButton(PIN_REMOTE_STOP, LONG_BUTTON_PRESS_MS);
+    pressButton(PIN_REMOTE_STOP, Config::Remote::LongButtonPressMs);
 }
 
 void RemoteController::pressButton(uint8_t pin, uint32_t durationMs)

@@ -67,6 +67,11 @@ Planned:
 
 This project does not connect to mains voltage or the awning motor directly. It only simulates button presses on the original battery-powered HSF1 remote.
 
+## Architecture
+
+- Configuration (`Config.h`)
+- Pin assignments (`Pins.h`)
+
 ## Development status
 
 Work in progress.

@@ -8,6 +8,7 @@ namespace Config
     {
         constexpr auto SSID = "GeschlosseneGesellschaft";
         constexpr auto Password = "Petrarcastrasse32";
+        constexpr uint32_t ReconnectIntervalMs = 10000;
     }
 
     namespace MQTT
@@ -34,10 +35,5 @@ namespace Config
     {
         constexpr uint32_t OpenTimeMs = 26300;
         constexpr uint32_t CloseTimeMs = 27000;
-    }
-
-    namespace WiFiManager
-    {
-        constexpr uint32_t ReconnectIntervalMs = 10000;
     }
 }
