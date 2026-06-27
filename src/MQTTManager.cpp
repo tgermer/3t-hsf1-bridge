@@ -3,25 +3,8 @@
 #include "Config.h"
 #include "Logger.h"
 
-byte *MQTTManager::getHardwareMacAddress()
-{
-    static byte macAddress[6] = {0};
-
-    uint64_t chipId = ESP.getEfuseMac();
-
-    macAddress[0] = static_cast<byte>(chipId >> 0);
-    macAddress[1] = static_cast<byte>(chipId >> 8);
-    macAddress[2] = static_cast<byte>(chipId >> 16);
-    macAddress[3] = static_cast<byte>(chipId >> 24);
-    macAddress[4] = static_cast<byte>(chipId >> 32);
-    macAddress[5] = static_cast<byte>(chipId >> 40);
-
-    return macAddress;
-}
-
 MQTTManager::MQTTManager()
-    : device(getHardwareMacAddress(), 6),
-      mqtt(wifiClient, device),
+    : mqtt(wifiClient, device),
       started(false),
       lastConnectionState(false)
 {
@@ -31,7 +14,10 @@ void MQTTManager::begin()
 {
     Logger::info("Initializing MQTT manager");
 
-    byte *macAddress = getHardwareMacAddress();
+    byte macAddress[6];
+    WiFi.macAddress(macAddress);
+    device.setUniqueId(macAddress, sizeof(macAddress));
+
     Logger::info(
         "Device MAC address: " +
         String(macAddress[0], HEX) + ":" +
@@ -47,10 +33,23 @@ void MQTTManager::begin()
 
 void MQTTManager::connect()
 {
-    if (started)
+    // Avoid rapid reconnect loops.
+    // Mosquitto may close stale connections after keepalive timeouts.
+    // Waiting between attempts prevents repeated session takeovers.
+    if (started && isConnected())
     {
         return;
     }
+
+    unsigned long now = millis();
+
+    if (lastConnectAttemptMs > 0 &&
+        now - lastConnectAttemptMs < ReconnectIntervalMs)
+    {
+        return;
+    }
+
+    lastConnectAttemptMs = now;
 
     Logger::info(
         "Connecting MQTT broker " +
@@ -93,6 +92,7 @@ void MQTTManager::update()
         else
         {
             Logger::warning("MQTT disconnected");
+            started = false; // Allow a fresh mqtt.begin(...) on the next reconnect attempt.
         }
 
         lastConnectionState = connected;

@@ -20,7 +20,6 @@ public:
     HADevice &getDevice();
 
 private:
-    static byte *getHardwareMacAddress();
     WiFiClient wifiClient;
 
     HADevice device;
@@ -28,5 +27,8 @@ private:
 
     bool started = false;
     bool lastConnectionState = false;
-    // unsigned long lastLoopLogMs = 0;
+
+    unsigned long lastConnectAttemptMs = 0;
+
+    static constexpr unsigned long ReconnectIntervalMs = 10000;
 };

@@ -37,7 +37,8 @@ void HomeAssistantBridge::begin()
 
 void HomeAssistantBridge::update()
 {
-    publishPositionIfNeeded();
+    // Temporarily disabled to isolate the MQTT keepalive disconnect issue.
+    // Re-enable publishPositionIfNeeded() after the MQTT connection is stable.
 }
 
 void HomeAssistantBridge::publishPositionIfNeeded()
@@ -45,7 +46,12 @@ void HomeAssistantBridge::publishPositionIfNeeded()
     unsigned long now = millis();
     int currentPosition = constrain(position.getPosition(), 0, 100);
 
-    if (currentPosition == lastPublishedPosition &&
+    if (currentPosition == lastPublishedPosition)
+    {
+        return;
+    }
+
+    if (position.isMoving() &&
         now - lastPositionPublishMs < PositionPublishIntervalMs)
     {
         return;
