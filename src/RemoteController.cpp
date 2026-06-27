@@ -14,6 +14,20 @@ void RemoteController::begin()
     digitalWrite(Pins::Remote::Close, LOW);
 }
 
+void RemoteController::update()
+{
+    if (!buttonActive)
+    {
+        return;
+    }
+
+    if (millis() - buttonStartedAt >= buttonDurationMs)
+    {
+        digitalWrite(activePin, LOW);
+        buttonActive = false;
+    }
+}
+
 void RemoteController::pressOpen()
 {
     pressButton(Pins::Remote::Open, Config::Remote::ButtonPressMs);
@@ -36,7 +50,15 @@ void RemoteController::pressFavoritePosition()
 
 void RemoteController::pressButton(uint8_t pin, uint32_t durationMs)
 {
-    digitalWrite(pin, HIGH);
-    delay(durationMs);
-    digitalWrite(pin, LOW);
+    if (buttonActive)
+    {
+        digitalWrite(activePin, LOW);
+    }
+
+    activePin = pin;
+    buttonDurationMs = durationMs;
+    buttonStartedAt = millis();
+    buttonActive = true;
+
+    digitalWrite(activePin, HIGH);
 }
