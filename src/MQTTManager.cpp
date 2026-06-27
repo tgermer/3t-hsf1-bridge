@@ -79,12 +79,12 @@ void MQTTManager::update()
 
     mqtt.loop();
 
-    unsigned long now = millis();
-    if (now - lastLoopLogMs >= 5000)
-    {
-        lastLoopLogMs = now;
-        Logger::info("MQTT loop running, connected=" + String(isConnected() ? "true" : "false"));
-    }
+    // unsigned long now = millis();
+    // if (now - lastLoopLogMs >= 5000)
+    // {
+    //     lastLoopLogMs = now;
+    //     Logger::info("MQTT loop running, connected=" + String(isConnected() ? "true" : "false"));
+    // }
 
     bool connected = isConnected();
 

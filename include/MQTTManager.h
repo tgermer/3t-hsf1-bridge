@@ -28,5 +28,5 @@ private:
 
     bool started = false;
     bool lastConnectionState = false;
-    unsigned long lastLoopLogMs = 0;
+    // unsigned long lastLoopLogMs = 0;
 };
