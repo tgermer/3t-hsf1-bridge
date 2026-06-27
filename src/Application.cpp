@@ -28,6 +28,7 @@ void Application::update()
     mqtt.update();
     bridge.update();
     position.update();
+    leds.update();
 
     leds.setWifi(wifi.isConnected());
     leds.setMqtt(mqtt.isConnected());

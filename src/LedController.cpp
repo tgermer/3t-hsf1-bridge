@@ -17,6 +17,20 @@ void LedController::begin()
     digitalWrite(Pins::Led::Error, LOW);
 }
 
+void LedController::update()
+{
+    if (!sendLedActive)
+    {
+        return;
+    }
+
+    if (millis() - sendLedStartedAt >= SendFlashDurationMs)
+    {
+        digitalWrite(Pins::Led::Send, LOW);
+        sendLedActive = false;
+    }
+}
+
 void LedController::setWifi(bool connected)
 {
     digitalWrite(Pins::Led::WiFi, connected);
@@ -35,6 +49,6 @@ void LedController::setError(bool error)
 void LedController::flashSend()
 {
     digitalWrite(Pins::Led::Send, HIGH);
-    delay(100);
-    digitalWrite(Pins::Led::Send, LOW);
+    sendLedActive = true;
+    sendLedStartedAt = millis();
 }
