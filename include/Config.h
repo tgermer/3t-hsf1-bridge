@@ -23,7 +23,6 @@ namespace Config
     {
         constexpr auto Name = "3T HSF1 Bridge";
         constexpr auto Version = "0.1.0";
-        constexpr byte MacAddress[6] = {0xA5, 0x5C, 0xDB, 0xDF, 0x7B, 0x37};
     }
 
     namespace Remote

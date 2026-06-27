@@ -4,7 +4,7 @@
 #include "Logger.h"
 
 MQTTManager::MQTTManager()
-    : device(Config::Device::MacAddress, sizeof(Config::Device::MacAddress)),
+    : device(macAddress, sizeof(macAddress)),
       mqtt(wifiClient, device)
 {
 }
@@ -12,6 +12,16 @@ MQTTManager::MQTTManager()
 void MQTTManager::begin()
 {
     Logger::info("Initializing MQTT manager");
+
+    WiFi.macAddress(macAddress);
+    Logger::info(
+        "Device MAC address: " +
+        String(macAddress[0], HEX) + ":" +
+        String(macAddress[1], HEX) + ":" +
+        String(macAddress[2], HEX) + ":" +
+        String(macAddress[3], HEX) + ":" +
+        String(macAddress[4], HEX) + ":" +
+        String(macAddress[5], HEX));
 
     device.setName(Config::Device::Name);
     device.setSoftwareVersion(Config::Device::Version);
