@@ -14,6 +14,7 @@ public:
     void update();
 
     bool isConnected() const;
+    bool isStarted() const;
 
     HAMqtt &getMqtt();
     HADevice &getDevice();
@@ -25,5 +26,7 @@ private:
     HADevice device;
     HAMqtt mqtt;
 
+    bool started = false;
     bool lastConnectionState = false;
+    unsigned long lastLoopLogMs = 0;
 };

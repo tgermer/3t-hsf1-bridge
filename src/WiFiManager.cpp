@@ -25,7 +25,7 @@ void WiFiManager::update()
 
 bool WiFiManager::isConnected() const
 {
-    return WiFi.status() == WL_CONNECTED;
+    return state == WiFiConnectionState::Connected;
 }
 
 String WiFiManager::getIpAddress() const
@@ -60,6 +60,11 @@ void WiFiManager::startConnection()
 
 void WiFiManager::handleConnected()
 {
+    if (WiFi.localIP().toString() == "0.0.0.0")
+    {
+        return;
+    }
+
     if (state != WiFiConnectionState::Connected)
     {
         state = WiFiConnectionState::Connected;

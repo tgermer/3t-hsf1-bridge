@@ -19,12 +19,17 @@ void Application::begin()
     wifi.begin();
     mqtt.begin();
     bridge.begin();
-    mqtt.connect();
 }
 
 void Application::update()
 {
     wifi.update();
+
+    if (wifi.isConnected() && !mqtt.isStarted())
+    {
+        mqtt.connect();
+    }
+
     mqtt.update();
     bridge.update();
     position.update();

@@ -21,7 +21,9 @@ byte *MQTTManager::getHardwareMacAddress()
 
 MQTTManager::MQTTManager()
     : device(getHardwareMacAddress(), 6),
-      mqtt(wifiClient, device)
+      mqtt(wifiClient, device),
+      started(false),
+      lastConnectionState(false)
 {
 }
 
@@ -45,6 +47,11 @@ void MQTTManager::begin()
 
 void MQTTManager::connect()
 {
+    if (started)
+    {
+        return;
+    }
+
     Logger::info(
         "Connecting MQTT broker " +
         String(Config::MQTT::Host) +
@@ -58,12 +65,26 @@ void MQTTManager::connect()
         Config::MQTT::Username,
         Config::MQTT::Password);
 
+    started = true;
+
     Logger::info("MQTT begin called");
 }
 
 void MQTTManager::update()
 {
+    if (!started)
+    {
+        return;
+    }
+
     mqtt.loop();
+
+    unsigned long now = millis();
+    if (now - lastLoopLogMs >= 5000)
+    {
+        lastLoopLogMs = now;
+        Logger::info("MQTT loop running, connected=" + String(isConnected() ? "true" : "false"));
+    }
 
     bool connected = isConnected();
 
@@ -85,6 +106,11 @@ void MQTTManager::update()
 bool MQTTManager::isConnected() const
 {
     return mqtt.isConnected();
+}
+
+bool MQTTManager::isStarted() const
+{
+    return started;
 }
 
 HAMqtt &MQTTManager::getMqtt()
