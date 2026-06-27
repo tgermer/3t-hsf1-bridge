@@ -13,7 +13,7 @@ HomeAssistantBridge::HomeAssistantBridge(
       remote(remote),
       position(position),
       leds(leds),
-      awningCover("markise")
+      awningCover("markise", HACover::PositionFeature)
 {
 }
 
@@ -28,14 +28,64 @@ void HomeAssistantBridge::begin()
     awningCover.setIcon("mdi:awning-outline");
     awningCover.setOptimistic(true);
     awningCover.onCommand(onCoverCommand);
-    awningCover.setCurrentState(HACover::StateUnknown);
+    awningCover.setPosition(position.getPosition());
+    awningCover.setState(HACover::StateClosed);
+    lastPublishedPosition = position.getPosition();
 
     Logger::info("Home Assistant cover registered");
 }
 
 void HomeAssistantBridge::update()
 {
-    // Reserved for future Home Assistant updates.
+    publishPositionIfNeeded();
+}
+
+void HomeAssistantBridge::publishPositionIfNeeded()
+{
+    unsigned long now = millis();
+    int currentPosition = constrain(position.getPosition(), 0, 100);
+
+    if (currentPosition == lastPublishedPosition &&
+        now - lastPositionPublishMs < PositionPublishIntervalMs)
+    {
+        return;
+    }
+
+    awningCover.setPosition(currentPosition);
+    publishCoverState();
+
+    lastPublishedPosition = currentPosition;
+    lastPositionPublishMs = now;
+}
+
+void HomeAssistantBridge::publishCoverState()
+{
+    if (position.isMoving())
+    {
+        if (position.getDirection() == MovementDirection::Opening)
+        {
+            awningCover.setState(HACover::StateOpening);
+        }
+        else if (position.getDirection() == MovementDirection::Closing)
+        {
+            awningCover.setState(HACover::StateClosing);
+        }
+
+        return;
+    }
+
+    if (position.getPosition() <= 0)
+    {
+        awningCover.setState(HACover::StateClosed);
+    }
+    else if (position.getPosition() >= 100)
+    {
+        awningCover.setState(HACover::StateOpen);
+    }
+    else
+    {
+        awningCover.setState(HACover::StateStopped);
+    }
 }
 
 void HomeAssistantBridge::onCoverCommand(HACover::CoverCommand cmd, HACover *sender)
@@ -59,7 +109,7 @@ void HomeAssistantBridge::handleCoverCommand(HACover::CoverCommand cmd)
         remote.pressOpen();
         position.startOpening();
 
-        awningCover.setState(HACover::StateOpen);
+        awningCover.setState(HACover::StateOpening);
     }
     else if (cmd == HACover::CommandClose)
     {
@@ -69,7 +119,7 @@ void HomeAssistantBridge::handleCoverCommand(HACover::CoverCommand cmd)
         remote.pressClose();
         position.startClosing();
 
-        awningCover.setState(HACover::StateClosed);
+        awningCover.setState(HACover::StateClosing);
     }
     else if (cmd == HACover::CommandStop)
     {

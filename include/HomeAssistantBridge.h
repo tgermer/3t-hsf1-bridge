@@ -27,8 +27,16 @@ private:
 
     HACover awningCover;
 
+    int lastPublishedPosition = -1;
+    unsigned long lastPositionPublishMs = 0;
+
+    static constexpr unsigned long PositionPublishIntervalMs = 1000;
+
     static HomeAssistantBridge *instance;
     static void onCoverCommand(HACover::CoverCommand cmd, HACover *sender);
+
+    void publishPositionIfNeeded();
+    void publishCoverState();
 
     void handleCoverCommand(HACover::CoverCommand cmd);
 };
