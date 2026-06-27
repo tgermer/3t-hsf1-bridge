@@ -25,7 +25,7 @@ void HomeAssistantBridge::begin()
 
     awningCover.setName("Markise");
     awningCover.setDeviceClass("awning");
-    awningCover.setIcon("mdi:awning");
+    awningCover.setIcon("mdi:awning-outline");
     awningCover.setOptimistic(true);
     awningCover.onCommand(onCoverCommand);
     awningCover.setCurrentState(HACover::StateUnknown);
