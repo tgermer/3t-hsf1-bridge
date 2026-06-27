@@ -1,3 +1,5 @@
+> This repository is both a firmware project and a learning project.
+
 # 3T HSF1 Bridge
 
 ![HSF1](docs/images/front.jpeg)
