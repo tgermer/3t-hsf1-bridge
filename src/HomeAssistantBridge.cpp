@@ -13,7 +13,8 @@ HomeAssistantBridge::HomeAssistantBridge(
       remote(remote),
       position(position),
       leds(leds),
-      awningCover("markise", HACover::PositionFeature)
+      awningCover("markise", HACover::PositionFeature),
+      savedPositionButton("markise_saved_position")
 {
 }
 
@@ -30,6 +31,11 @@ void HomeAssistantBridge::begin()
     awningCover.onCommand(onCoverCommand);
     awningCover.setPosition(position.getPosition());
     awningCover.setState(HACover::StateClosed);
+
+    savedPositionButton.setName("Gespeicherte Position");
+    savedPositionButton.setIcon("mdi:star-outline");
+    savedPositionButton.onCommand(onSavedPositionCommand);
+
     lastPublishedPosition = position.getPosition();
 
     Logger::info("Home Assistant cover registered");
@@ -105,6 +111,17 @@ void HomeAssistantBridge::onCoverCommand(HACover::CoverCommand cmd, HACover *sen
     instance->handleCoverCommand(cmd);
 }
 
+void HomeAssistantBridge::onSavedPositionCommand(HAButton *sender)
+{
+    if (instance == nullptr)
+    {
+        Logger::error("HomeAssistantBridge instance is null");
+        return;
+    }
+
+    instance->handleSavedPositionCommand();
+}
+
 void HomeAssistantBridge::handleCoverCommand(HACover::CoverCommand cmd)
 {
     if (cmd == HACover::CommandOpen)
@@ -137,4 +154,14 @@ void HomeAssistantBridge::handleCoverCommand(HACover::CoverCommand cmd)
 
         awningCover.setState(HACover::StateStopped);
     }
+}
+
+void HomeAssistantBridge::handleSavedPositionCommand()
+{
+    Logger::info("Home Assistant command: Saved position");
+
+    leds.flashSend();
+    remote.pressFavoritePosition();
+
+    awningCover.setState(HACover::StateStopped);
 }
