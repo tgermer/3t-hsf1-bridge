@@ -19,7 +19,7 @@ public:
     HADevice &getDevice();
 
 private:
-    byte macAddress[6] = {0};
+    static byte *getHardwareMacAddress();
     WiFiClient wifiClient;
 
     HADevice device;

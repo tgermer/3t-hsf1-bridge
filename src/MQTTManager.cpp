@@ -3,8 +3,24 @@
 #include "Config.h"
 #include "Logger.h"
 
+byte *MQTTManager::getHardwareMacAddress()
+{
+    static byte macAddress[6] = {0};
+
+    uint64_t chipId = ESP.getEfuseMac();
+
+    macAddress[0] = static_cast<byte>(chipId >> 0);
+    macAddress[1] = static_cast<byte>(chipId >> 8);
+    macAddress[2] = static_cast<byte>(chipId >> 16);
+    macAddress[3] = static_cast<byte>(chipId >> 24);
+    macAddress[4] = static_cast<byte>(chipId >> 32);
+    macAddress[5] = static_cast<byte>(chipId >> 40);
+
+    return macAddress;
+}
+
 MQTTManager::MQTTManager()
-    : device(macAddress, sizeof(macAddress)),
+    : device(getHardwareMacAddress(), 6),
       mqtt(wifiClient, device)
 {
 }
@@ -13,7 +29,7 @@ void MQTTManager::begin()
 {
     Logger::info("Initializing MQTT manager");
 
-    WiFi.macAddress(macAddress);
+    byte *macAddress = getHardwareMacAddress();
     Logger::info(
         "Device MAC address: " +
         String(macAddress[0], HEX) + ":" +
