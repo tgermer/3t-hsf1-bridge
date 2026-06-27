@@ -28,7 +28,7 @@ public:
     bool isMoving() const;
 
 private:
-    int position = 0; // 0 = eingefahren, 100 = ausgefahren
+    float position = 0.0f; // 0 = eingefahren, 100 = ausgefahren
     MovementDirection direction = MovementDirection::Idle;
     unsigned long lastUpdateMs = 0;
 

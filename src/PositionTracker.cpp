@@ -5,7 +5,7 @@
 
 void PositionTracker::begin()
 {
-    position = 0;
+    position = 0.0f;
     direction = MovementDirection::Idle;
     lastUpdateMs = millis();
 
@@ -38,12 +38,12 @@ void PositionTracker::stop()
 
     direction = MovementDirection::Idle;
 
-    Logger::info("Position tracking stopped at " + String(position) + "%");
+    Logger::info("Position tracking stopped at " + String(getPosition()) + "%");
 }
 
 void PositionTracker::setFullyOpen()
 {
-    position = 100;
+    position = 100.0f;
     direction = MovementDirection::Idle;
 
     Logger::info("Position set to fully open");
@@ -51,7 +51,7 @@ void PositionTracker::setFullyOpen()
 
 void PositionTracker::setFullyClosed()
 {
-    position = 0;
+    position = 0.0f;
     direction = MovementDirection::Idle;
 
     Logger::info("Position set to fully closed");
@@ -78,7 +78,7 @@ void PositionTracker::update()
 
 int PositionTracker::getPosition() const
 {
-    return position;
+    return static_cast<int>(round(position));
 }
 
 MovementDirection PositionTracker::getDirection() const
@@ -96,11 +96,11 @@ void PositionTracker::applyMovement(unsigned long elapsedMs)
     if (direction == MovementDirection::Opening)
     {
         float delta = (elapsedMs * 100.0f) / Config::Awning::OpenTimeMs;
-        position += round(delta);
+        position += delta;
 
         if (position >= 100)
         {
-            position = 100;
+            position = 100.0f;
             direction = MovementDirection::Idle;
             Logger::info("Position reached fully open");
         }
@@ -108,11 +108,11 @@ void PositionTracker::applyMovement(unsigned long elapsedMs)
     else if (direction == MovementDirection::Closing)
     {
         float delta = (elapsedMs * 100.0f) / Config::Awning::CloseTimeMs;
-        position -= round(delta);
+        position -= delta;
 
         if (position <= 0)
         {
-            position = 0;
+            position = 0.0f;
             direction = MovementDirection::Idle;
             Logger::info("Position reached fully closed");
         }
