@@ -4,3 +4,5 @@
 .vscode/launch.json
 .vscode/ipch
 include/Config copy.h
+.DS_Store
+.$wiring.drawio.bkp
