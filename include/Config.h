@@ -22,7 +22,7 @@ namespace Config
     namespace Device
     {
         constexpr auto Name = "3T HSF1 Bridge";
-        constexpr auto Version = "0.1.0";
+        constexpr auto Version = "1.0.0";
     }
 
     namespace Remote
