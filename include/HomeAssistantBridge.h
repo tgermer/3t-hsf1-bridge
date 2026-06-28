@@ -30,6 +30,7 @@ private:
     HANumber targetPositionNumber;
 
     int lastPublishedPosition = -1;
+    HACover::CoverState lastPublishedState = HACover::StateUnknown;
     unsigned long lastPositionPublishMs = 0;
     bool targetPositionActive = false;
     int targetPosition = -1;
@@ -43,7 +44,10 @@ private:
     static void onTargetPositionCommand(HANumeric number, HANumber *sender);
 
     void publishPositionIfNeeded();
+    void publishPosition(bool force = false);
     void publishCoverState();
+    void publishCoverState(HACover::CoverState state);
+    HACover::CoverState getCoverState() const;
     void updateTargetPositionMovement();
 
     void handleCoverCommand(HACover::CoverCommand cmd);

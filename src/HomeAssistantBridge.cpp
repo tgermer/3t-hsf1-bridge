@@ -28,10 +28,16 @@ void HomeAssistantBridge::begin()
     awningCover.setName("Markise");
     awningCover.setDeviceClass("awning");
     awningCover.setIcon("mdi:awning-outline");
-    awningCover.setOptimistic(true);
+    awningCover.setOptimistic(false);
     awningCover.onCommand(onCoverCommand);
-    awningCover.setPosition(position.getPosition());
-    awningCover.setState(HACover::StateClosed);
+
+    int initialPosition = constrain(position.getPosition(), 0, 100);
+    if (awningCover.setPosition(initialPosition))
+    {
+        lastPublishedPosition = initialPosition;
+    }
+
+    publishCoverState();
 
     savedPositionButton.setName("Gespeicherte Position");
     savedPositionButton.setIcon("mdi:star-outline");
@@ -46,15 +52,14 @@ void HomeAssistantBridge::begin()
     targetPositionNumber.onCommand(onTargetPositionCommand);
     targetPositionNumber.setState(position.getPosition());
 
-    lastPublishedPosition = position.getPosition();
-
     Logger::info("Home Assistant cover registered");
 }
 
 void HomeAssistantBridge::update()
 {
-    publishPositionIfNeeded();
     updateTargetPositionMovement();
+    publishPositionIfNeeded();
+    publishCoverState();
 }
 
 void HomeAssistantBridge::publishPositionIfNeeded()
@@ -73,41 +78,64 @@ void HomeAssistantBridge::publishPositionIfNeeded()
         return;
     }
 
-    awningCover.setPosition(currentPosition);
-    publishCoverState();
+    publishPosition();
+}
 
-    lastPublishedPosition = currentPosition;
-    lastPositionPublishMs = now;
+void HomeAssistantBridge::publishPosition(bool force)
+{
+    int currentPosition = constrain(position.getPosition(), 0, 100);
+
+    if (awningCover.setPosition(currentPosition, force))
+    {
+        lastPublishedPosition = currentPosition;
+        lastPositionPublishMs = millis();
+    }
 }
 
 void HomeAssistantBridge::publishCoverState()
+{
+    publishCoverState(getCoverState());
+}
+
+void HomeAssistantBridge::publishCoverState(HACover::CoverState state)
+{
+    if (state == lastPublishedState)
+    {
+        return;
+    }
+
+    if (awningCover.setState(state))
+    {
+        lastPublishedState = state;
+    }
+}
+
+HACover::CoverState HomeAssistantBridge::getCoverState() const
 {
     if (position.isMoving())
     {
         if (position.getDirection() == MovementDirection::Opening)
         {
-            awningCover.setState(HACover::StateOpening);
-        }
-        else if (position.getDirection() == MovementDirection::Closing)
-        {
-            awningCover.setState(HACover::StateClosing);
+            return HACover::StateOpening;
         }
 
-        return;
+        if (position.getDirection() == MovementDirection::Closing)
+        {
+            return HACover::StateClosing;
+        }
     }
 
     if (position.getPosition() <= 0)
     {
-        awningCover.setState(HACover::StateClosed);
+        return HACover::StateClosed;
     }
-    else if (position.getPosition() >= 100)
+
+    if (position.getPosition() >= 100)
     {
-        awningCover.setState(HACover::StateOpen);
+        return HACover::StateOpen;
     }
-    else
-    {
-        awningCover.setState(HACover::StateStopped);
-    }
+
+    return HACover::StateStopped;
 }
 
 void HomeAssistantBridge::updateTargetPositionMovement()
@@ -143,8 +171,8 @@ void HomeAssistantBridge::updateTargetPositionMovement()
 
     targetPositionActive = false;
 
-    awningCover.setPosition(targetPosition, true);
-    awningCover.setState(HACover::StateStopped);
+    publishPosition(true);
+    publishCoverState();
     targetPositionNumber.setState(targetPosition);
 }
 
@@ -192,7 +220,7 @@ void HomeAssistantBridge::handleCoverCommand(HACover::CoverCommand cmd)
         remote.pressOpen();
         position.startOpening();
 
-        awningCover.setState(HACover::StateOpening);
+        publishCoverState();
     }
     else if (cmd == HACover::CommandClose)
     {
@@ -203,18 +231,20 @@ void HomeAssistantBridge::handleCoverCommand(HACover::CoverCommand cmd)
         remote.pressClose();
         position.startClosing();
 
-        awningCover.setState(HACover::StateClosing);
+        publishCoverState();
     }
     else if (cmd == HACover::CommandStop)
     {
         Logger::info("Home Assistant command: Stop");
         targetPositionActive = false;
 
-        leds.flashSend();
-        remote.pressStop();
         position.stop();
 
-        awningCover.setState(HACover::StateStopped);
+        leds.flashSend();
+        remote.pressStop();
+
+        publishPosition(true);
+        publishCoverState();
     }
 }
 
@@ -226,7 +256,7 @@ void HomeAssistantBridge::handleSavedPositionCommand()
     leds.flashSend();
     remote.pressFavoritePosition();
 
-    awningCover.setState(HACover::StateStopped);
+    publishCoverState(HACover::StateStopped);
 }
 
 void HomeAssistantBridge::handleTargetPositionCommand(HANumeric number)
@@ -252,8 +282,16 @@ void HomeAssistantBridge::handleTargetPositionCommand(HANumeric number)
     if (abs(currentPosition - requestedPosition) <= TargetPositionTolerance)
     {
         targetPositionActive = false;
-        awningCover.setPosition(requestedPosition, true);
-        awningCover.setState(HACover::StateStopped);
+
+        if (position.isMoving())
+        {
+            leds.flashSend();
+            remote.pressStop();
+            position.stop();
+        }
+
+        publishPosition(true);
+        publishCoverState();
         return;
     }
 
@@ -266,12 +304,12 @@ void HomeAssistantBridge::handleTargetPositionCommand(HANumeric number)
     {
         remote.pressOpen();
         position.startOpening();
-        awningCover.setState(HACover::StateOpening);
+        publishCoverState();
     }
     else
     {
         remote.pressClose();
         position.startClosing();
-        awningCover.setState(HACover::StateClosing);
+        publishCoverState();
     }
 }
