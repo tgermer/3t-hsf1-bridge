@@ -6,39 +6,10 @@
 #include "HomeAssistantDiagnostics.h"
 #include "LedController.h"
 #include "MQTTManager.h"
+#include "NativeCoverMqtt.h"
 #include "PositionTracker.h"
 #include "RemoteController.h"
 #include "WiFiManager.h"
-
-class NativePositionCover : public HACover
-{
-public:
-    using MqttConnectedCallback = void (*)();
-
-    NativePositionCover(const char *uniqueId, Features features)
-        : HACover(uniqueId, features)
-    {
-    }
-
-    void setMqttConnectedCallback(MqttConnectedCallback callback)
-    {
-        mqttConnectedCallback = callback;
-    }
-
-protected:
-    void onMqttConnected() override
-    {
-        // HACover discovery lacks set_position_topic in this ArduinoHA version.
-        // The bridge owns the complete cover discovery and subscriptions instead.
-        if (mqttConnectedCallback != nullptr)
-        {
-            mqttConnectedCallback();
-        }
-    }
-
-private:
-    MqttConnectedCallback mqttConnectedCallback = nullptr;
-};
 
 class HomeAssistantBridge
 {
@@ -64,9 +35,7 @@ private:
     HAButton savedPositionButton;
     HANumber savedPositionAssumedPercentNumber;
     HomeAssistantDiagnostics diagnostics;
-    String coverCommandTopic;
-    String coverPositionCommandTopic;
-    String coverDiscoveryTopic;
+    NativeCoverMqtt nativeCoverMqtt;
     Preferences preferences;
 
     int lastPublishedPosition = -1;
@@ -79,12 +48,8 @@ private:
     int targetPosition = -1;
     int savedPositionAssumedPercent = 0;
     bool preferencesReady = false;
-    bool coverSetupComplete = false;
-    bool coverMqttSetupPending = false;
-    unsigned long lastCoverMqttSetupAttemptMs = 0;
 
     static constexpr unsigned long PositionPublishIntervalMs = 1000;
-    static constexpr unsigned long CoverMqttSetupRetryMs = 5000;
     static constexpr int TargetPositionTolerance = 1;
 
     static HomeAssistantBridge *instance;
@@ -92,8 +57,9 @@ private:
     static void onSavedPositionCommand(HAButton *sender);
     static void onSavedPositionAssumedPercentCommand(HANumeric number, HANumber *sender);
     static void onRemoteCommandStarted(RemoteController::Command command);
-    static void onCoverMqttConnected();
-    static void onMqttMessage(const char *topic, const uint8_t *payload, uint16_t length);
+    static void onNativeSetPositionCommand(
+        const uint8_t *payload,
+        uint16_t length);
 
     void publishPositionIfNeeded();
     bool publishPosition(bool force = false);
@@ -102,11 +68,9 @@ private:
     void publishCoverState(HACover::CoverState state, bool force = false);
     HACover::CoverState getCoverState() const;
     void synchronizeMqttState();
-    void configureNativePositionMqtt();
-    void setupCoverMqttConnection();
-    bool publishCoverDiscovery();
-    void removeLegacyTargetPositionDiscovery();
-    void handleMqttMessage(const char *topic, const uint8_t *payload, uint16_t length);
+    void handleNativeSetPositionCommand(
+        const uint8_t *payload,
+        uint16_t length);
     void updateTargetPositionMovement();
 
     void handleCoverCommand(HACover::CoverCommand cmd);
