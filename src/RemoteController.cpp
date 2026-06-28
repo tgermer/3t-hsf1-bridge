@@ -12,6 +12,9 @@ void RemoteController::begin()
     digitalWrite(Pins::Remote::Open, LOW);
     digitalWrite(Pins::Remote::Stop, LOW);
     digitalWrite(Pins::Remote::Close, LOW);
+
+    buttonActive = false;
+    pendingRequestAvailable = false;
 }
 
 void RemoteController::update()
@@ -25,40 +28,71 @@ void RemoteController::update()
     {
         digitalWrite(activePin, LOW);
         buttonActive = false;
+
+        if (pendingRequestAvailable)
+        {
+            ButtonRequest request = pendingRequest;
+            pendingRequestAvailable = false;
+            startButton(request);
+        }
     }
 }
 
 void RemoteController::pressOpen()
 {
-    pressButton(Pins::Remote::Open, Config::Remote::ButtonPressMs);
+    queueButton(Command::Open, Pins::Remote::Open, Config::Remote::ButtonPressMs);
 }
 
 void RemoteController::pressStop()
 {
-    pressButton(Pins::Remote::Stop, Config::Remote::ButtonPressMs);
+    queueButton(Command::Stop, Pins::Remote::Stop, Config::Remote::ButtonPressMs);
 }
 
 void RemoteController::pressClose()
 {
-    pressButton(Pins::Remote::Close, Config::Remote::ButtonPressMs);
+    queueButton(Command::Close, Pins::Remote::Close, Config::Remote::ButtonPressMs);
 }
 
 void RemoteController::pressFavoritePosition()
 {
-    pressButton(Pins::Remote::Stop, Config::Remote::LongButtonPressMs);
+    queueButton(Command::Favorite, Pins::Remote::Stop, Config::Remote::LongButtonPressMs);
 }
 
-void RemoteController::pressButton(uint8_t pin, uint32_t durationMs)
+void RemoteController::onCommandStarted(CommandStartedCallback callback)
 {
-    if (buttonActive)
+    commandStartedCallback = callback;
+}
+
+void RemoteController::queueButton(Command command, uint8_t pin, uint32_t durationMs)
+{
+    ButtonRequest request;
+    request.command = command;
+    request.pin = pin;
+    request.durationMs = durationMs;
+
+    if (!buttonActive)
     {
-        digitalWrite(activePin, LOW);
+        startButton(request);
+        return;
     }
 
-    activePin = pin;
-    buttonDurationMs = durationMs;
+    // Never interrupt the active pulse. Keeping only the newest pending command
+    // avoids executing stale movement commands after the user's intent has changed.
+    pendingRequest = request;
+    pendingRequestAvailable = true;
+}
+
+void RemoteController::startButton(const ButtonRequest &request)
+{
+    activePin = request.pin;
+    buttonDurationMs = request.durationMs;
     buttonStartedAt = millis();
     buttonActive = true;
 
     digitalWrite(activePin, HIGH);
+
+    if (commandStartedCallback != nullptr)
+    {
+        commandStartedCallback(request.command);
+    }
 }

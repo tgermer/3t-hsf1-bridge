@@ -39,6 +39,7 @@ private:
     bool lastMqttConnected = false;
     bool targetPositionActive = false;
     bool targetPositionRequiresPhysicalStop = true;
+    bool pendingMovementStartsTarget = false;
     int targetPosition = -1;
     int savedPositionAssumedPercent = 0;
     bool preferencesReady = false;
@@ -50,6 +51,7 @@ private:
     static void onCoverCommand(HACover::CoverCommand cmd, HACover *sender);
     static void onSavedPositionCommand(HAButton *sender);
     static void onSavedPositionAssumedPercentCommand(HANumeric number, HANumber *sender);
+    static void onRemoteCommandStarted(RemoteController::Command command);
     static void onMqttMessage(const char *topic, const uint8_t *payload, uint16_t length);
 
     void publishPositionIfNeeded();
@@ -68,6 +70,7 @@ private:
     void handleCoverCommand(HACover::CoverCommand cmd);
     void handleSavedPositionCommand();
     void handleSavedPositionAssumedPercentCommand(HANumeric number);
+    void handleRemoteCommandStarted(RemoteController::Command command);
     void loadSavedPositionAssumedPercent();
     void moveToTargetPosition(int requestedPosition);
 };

@@ -33,6 +33,7 @@ void HomeAssistantBridge::begin()
     instance = this;
     configureNativePositionMqtt();
     loadSavedPositionAssumedPercent();
+    remote.onCommandStarted(onRemoteCommandStarted);
 
     awningCover.setName("Markise");
     awningCover.setDeviceClass("awning");
@@ -299,8 +300,10 @@ void HomeAssistantBridge::updateTargetPositionMovement()
 
     if (targetPositionRequiresPhysicalStop)
     {
-        leds.flashSend();
+        targetPositionActive = false;
+        pendingMovementStartsTarget = false;
         remote.pressStop();
+        return;
     }
 
     position.stop();
@@ -346,6 +349,14 @@ void HomeAssistantBridge::onSavedPositionAssumedPercentCommand(
     instance->handleSavedPositionAssumedPercentCommand(number);
 }
 
+void HomeAssistantBridge::onRemoteCommandStarted(RemoteController::Command command)
+{
+    if (instance != nullptr)
+    {
+        instance->handleRemoteCommandStarted(command);
+    }
+}
+
 void HomeAssistantBridge::onMqttMessage(
     const char *topic,
     const uint8_t *payload,
@@ -384,36 +395,25 @@ void HomeAssistantBridge::handleCoverCommand(HACover::CoverCommand cmd)
     {
         Logger::info("Home Assistant command: Open");
         targetPositionActive = false;
+        pendingMovementStartsTarget = false;
 
-        leds.flashSend();
         remote.pressOpen();
-        position.startOpening();
-
-        publishCoverState();
     }
     else if (cmd == HACover::CommandClose)
     {
         Logger::info("Home Assistant command: Close");
         targetPositionActive = false;
+        pendingMovementStartsTarget = false;
 
-        leds.flashSend();
         remote.pressClose();
-        position.startClosing();
-
-        publishCoverState();
     }
     else if (cmd == HACover::CommandStop)
     {
         Logger::info("Home Assistant command: Stop");
         targetPositionActive = false;
+        pendingMovementStartsTarget = false;
 
-        position.stop();
-
-        leds.flashSend();
         remote.pressStop();
-
-        publishFinalPosition();
-        publishCoverState();
     }
 }
 
@@ -421,6 +421,7 @@ void HomeAssistantBridge::handleSavedPositionCommand()
 {
     Logger::info("Home Assistant command: Saved position");
     targetPositionActive = false;
+    pendingMovementStartsTarget = false;
 
     int currentPosition = constrain(position.getPosition(), 0, 100);
     int assumedPosition = savedPositionAssumedPercent;
@@ -432,23 +433,7 @@ void HomeAssistantBridge::handleSavedPositionCommand()
         return;
     }
 
-    leds.flashSend();
     remote.pressFavoritePosition();
-
-    targetPosition = assumedPosition;
-    targetPositionRequiresPhysicalStop = false;
-    targetPositionActive = true;
-
-    if (currentPosition < assumedPosition)
-    {
-        position.startOpening();
-    }
-    else
-    {
-        position.startClosing();
-    }
-
-    publishCoverState();
 }
 
 void HomeAssistantBridge::handleSavedPositionAssumedPercentCommand(HANumeric number)
@@ -506,6 +491,66 @@ void HomeAssistantBridge::loadSavedPositionAssumedPercent()
     }
 }
 
+void HomeAssistantBridge::handleRemoteCommandStarted(RemoteController::Command command)
+{
+    leds.flashSend();
+
+    if (command == RemoteController::Command::Open)
+    {
+        position.startOpening();
+        targetPositionActive = pendingMovementStartsTarget;
+        pendingMovementStartsTarget = false;
+        publishCoverState();
+    }
+    else if (command == RemoteController::Command::Close)
+    {
+        position.startClosing();
+        targetPositionActive = pendingMovementStartsTarget;
+        pendingMovementStartsTarget = false;
+        publishCoverState();
+    }
+    else if (command == RemoteController::Command::Stop)
+    {
+        targetPositionActive = false;
+        pendingMovementStartsTarget = false;
+        position.stop();
+        publishFinalPosition();
+        publishCoverState();
+    }
+    else if (command == RemoteController::Command::Favorite)
+    {
+        int currentPosition = constrain(position.getPosition(), 0, 100);
+        int assumedPosition = savedPositionAssumedPercent;
+
+        pendingMovementStartsTarget = false;
+        targetPosition = assumedPosition;
+        targetPositionRequiresPhysicalStop = false;
+
+        if (abs(currentPosition - assumedPosition) <= TargetPositionTolerance)
+        {
+            targetPositionActive = false;
+            position.stop();
+            publishFinalPosition();
+            publishCoverState();
+        }
+        else
+        {
+            targetPositionActive = true;
+
+            if (currentPosition < assumedPosition)
+            {
+                position.startOpening();
+            }
+            else
+            {
+                position.startClosing();
+            }
+
+            publishCoverState();
+        }
+    }
+}
+
 void HomeAssistantBridge::moveToTargetPosition(int requestedPosition)
 {
     int currentPosition = constrain(position.getPosition(), 0, 100);
@@ -523,9 +568,10 @@ void HomeAssistantBridge::moveToTargetPosition(int requestedPosition)
 
         if (position.isMoving())
         {
-            leds.flashSend();
+            targetPositionActive = false;
+            pendingMovementStartsTarget = false;
             remote.pressStop();
-            position.stop();
+            return;
         }
 
         publishFinalPosition();
@@ -533,22 +579,17 @@ void HomeAssistantBridge::moveToTargetPosition(int requestedPosition)
         return;
     }
 
-    leds.flashSend();
-
     targetPosition = requestedPosition;
     targetPositionRequiresPhysicalStop = true;
-    targetPositionActive = true;
+    targetPositionActive = false;
+    pendingMovementStartsTarget = true;
 
     if (requestedPosition > currentPosition)
     {
         remote.pressOpen();
-        position.startOpening();
-        publishCoverState();
     }
     else
     {
         remote.pressClose();
-        position.startClosing();
-        publishCoverState();
     }
 }
