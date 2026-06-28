@@ -3,7 +3,7 @@
 #include "Logger.h"
 
 Application::Application()
-    : bridge(mqtt, remote, position, leds)
+    : bridge(wifi, mqtt, remote, position, leds)
 {
 }
 

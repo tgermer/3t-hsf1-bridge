@@ -44,6 +44,11 @@ String WiFiManager::getSSID() const
     return Config::WiFi::SSID;
 }
 
+uint32_t WiFiManager::getReconnectCount() const
+{
+    return reconnectCount;
+}
+
 WiFiConnectionState WiFiManager::getState() const
 {
     return state;
@@ -68,6 +73,15 @@ void WiFiManager::handleConnected()
 
     if (state != WiFiConnectionState::Connected)
     {
+        if (hasConnected)
+        {
+            reconnectCount++;
+        }
+        else
+        {
+            hasConnected = true;
+        }
+
         state = WiFiConnectionState::Connected;
         Logger::info("WiFi connected, IP: " + getIpAddress());
     }

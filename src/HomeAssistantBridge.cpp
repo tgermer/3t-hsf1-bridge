@@ -4,31 +4,67 @@
 #include "Logger.h"
 
 #include <WiFi.h>
-#include <time.h>
+#include <esp_system.h>
 
 namespace
 {
     constexpr auto PreferencesNamespace = "ha-bridge";
     constexpr auto SavedPositionPercentKey = "savedPercent";
-    constexpr time_t MinimumValidEpoch = 1609459200; // 2021-01-01T00:00:00Z
+
+    const char *resetReasonToString(esp_reset_reason_t reason)
+    {
+        switch (reason)
+        {
+        case ESP_RST_POWERON:
+            return "power_on";
+        case ESP_RST_EXT:
+            return "external";
+        case ESP_RST_SW:
+            return "software";
+        case ESP_RST_PANIC:
+            return "panic";
+        case ESP_RST_INT_WDT:
+            return "interrupt_watchdog";
+        case ESP_RST_TASK_WDT:
+            return "task_watchdog";
+        case ESP_RST_WDT:
+            return "watchdog";
+        case ESP_RST_DEEPSLEEP:
+            return "deep_sleep";
+        case ESP_RST_BROWNOUT:
+            return "brownout";
+        case ESP_RST_SDIO:
+            return "sdio";
+        default:
+            return "unknown";
+        }
+    }
 }
 
 HomeAssistantBridge *HomeAssistantBridge::instance = nullptr;
 
 HomeAssistantBridge::HomeAssistantBridge(
+    WiFiManager &wifiManager,
     MQTTManager &mqttManager,
     RemoteController &remote,
     PositionTracker &position,
     LedController &leds)
-    : mqttManager(mqttManager),
+    : wifiManager(wifiManager),
+      mqttManager(mqttManager),
       remote(remote),
       position(position),
       leds(leds),
       awningCover("markise", HACover::PositionFeature),
       savedPositionButton("markise_saved_position"),
       savedPositionAssumedPercentNumber("markise_saved_position_assumed_percent"),
-      bootTimestampSensor("boot_timestamp"),
+      wifiSsidSensor("wifi_ssid"),
+      ipAddressSensor("ip_address"),
+      macAddressSensor("mac_address"),
       wifiRssiSensor("wifi_rssi"),
+      freeHeapSensor("free_heap"),
+      resetReasonSensor("reset_reason"),
+      wifiReconnectCounterSensor("wifi_reconnect_count"),
+      mqttReconnectCounterSensor("mqtt_reconnect_count"),
       restartButton("restart")
 {
 }
@@ -67,9 +103,14 @@ void HomeAssistantBridge::begin()
     savedPositionAssumedPercentNumber.onCommand(onSavedPositionAssumedPercentCommand);
     savedPositionAssumedPercentNumber.setState(savedPositionAssumedPercent);
 
-    bootTimestampSensor.setName("Gestartet um");
-    bootTimestampSensor.setDeviceClass("timestamp");
-    bootTimestampSensor.setIcon("mdi:clock-start");
+    wifiSsidSensor.setName("WLAN SSID");
+    wifiSsidSensor.setIcon("mdi:wifi-settings");
+
+    ipAddressSensor.setName("IP-Adresse");
+    ipAddressSensor.setIcon("mdi:ip-network");
+
+    macAddressSensor.setName("MAC-Adresse");
+    macAddressSensor.setIcon("mdi:network-outline");
 
     wifiRssiSensor.setName("WLAN-Signalstärke");
     wifiRssiSensor.setDeviceClass("signal_strength");
@@ -77,6 +118,26 @@ void HomeAssistantBridge::begin()
     wifiRssiSensor.setUnitOfMeasurement("dBm");
     wifiRssiSensor.setIcon("mdi:wifi");
     wifiRssiSensor.setCurrentValue(static_cast<int32_t>(WiFi.RSSI()));
+
+    freeHeapSensor.setName("Freier Heap");
+    freeHeapSensor.setDeviceClass("data_size");
+    freeHeapSensor.setStateClass("measurement");
+    freeHeapSensor.setUnitOfMeasurement("kB");
+    freeHeapSensor.setIcon("mdi:memory");
+    freeHeapSensor.setCurrentValue(static_cast<uint32_t>(ESP.getFreeHeap() / 1000U));
+
+    resetReasonSensor.setName("Reset-Grund");
+    resetReasonSensor.setIcon("mdi:restart-alert");
+
+    wifiReconnectCounterSensor.setName("WLAN-Neuverbindungen");
+    wifiReconnectCounterSensor.setStateClass("total_increasing");
+    wifiReconnectCounterSensor.setIcon("mdi:wifi-sync");
+    wifiReconnectCounterSensor.setCurrentValue(wifiManager.getReconnectCount());
+
+    mqttReconnectCounterSensor.setName("MQTT-Neuverbindungen");
+    mqttReconnectCounterSensor.setStateClass("total_increasing");
+    mqttReconnectCounterSensor.setIcon("mdi:sync");
+    mqttReconnectCounterSensor.setCurrentValue(mqttManager.getReconnectCount());
 
     restartButton.setName("Neustart");
     restartButton.setDeviceClass("restart");
@@ -214,11 +275,23 @@ bool HomeAssistantBridge::publishDiagnostics(bool force)
     lastDiagnosticsPublishAttemptMs = millis();
 
     int32_t wifiRssi = WiFi.RSSI();
+    uint32_t freeHeapKb = ESP.getFreeHeap() / 1000U;
+    uint32_t wifiReconnectCount = wifiManager.getReconnectCount();
+    uint32_t mqttReconnectCount = mqttManager.getReconnectCount();
 
+    bool staticPublished = !force || publishStaticDiagnostics();
     bool wifiRssiPublished = wifiRssiSensor.setValue(wifiRssi, force);
-    bool bootTimestampPublished = publishBootTimestamp();
+    bool freeHeapPublished = freeHeapSensor.setValue(freeHeapKb, force);
+    bool wifiReconnectCountPublished =
+        wifiReconnectCounterSensor.setValue(wifiReconnectCount, force);
+    bool mqttReconnectCountPublished =
+        mqttReconnectCounterSensor.setValue(mqttReconnectCount, force);
 
-    if (wifiRssiPublished && bootTimestampPublished)
+    if (staticPublished &&
+        wifiRssiPublished &&
+        freeHeapPublished &&
+        wifiReconnectCountPublished &&
+        mqttReconnectCountPublished)
     {
         diagnosticsPublishPending = false;
         lastDiagnosticsPublishMs = millis();
@@ -236,37 +309,22 @@ bool HomeAssistantBridge::publishDiagnostics(bool force)
     return false;
 }
 
-bool HomeAssistantBridge::publishBootTimestamp()
+bool HomeAssistantBridge::publishStaticDiagnostics()
 {
-    time_t currentTime = time(nullptr);
+    String ssid = WiFi.SSID();
+    String ipAddress = WiFi.localIP().toString();
+    String macAddress = WiFi.macAddress();
 
-    if (currentTime < MinimumValidEpoch)
-    {
-        // No reliable wall-clock source is configured. Clear any retained value
-        // from an earlier boot so Home Assistant keeps the entity unknown.
-        return bootTimestampSensor.setValue(nullptr);
-    }
+    bool ssidPublished = wifiSsidSensor.setValue(ssid.c_str());
+    bool ipAddressPublished = ipAddressSensor.setValue(ipAddress.c_str());
+    bool macAddressPublished = macAddressSensor.setValue(macAddress.c_str());
+    bool resetReasonPublished =
+        resetReasonSensor.setValue(resetReasonToString(esp_reset_reason()));
 
-    time_t bootTime = currentTime - static_cast<time_t>(millis() / 1000UL);
-    struct tm bootTimeUtc;
-
-    if (gmtime_r(&bootTime, &bootTimeUtc) == nullptr)
-    {
-        return false;
-    }
-
-    char timestamp[21];
-
-    if (strftime(
-            timestamp,
-            sizeof(timestamp),
-            "%Y-%m-%dT%H:%M:%SZ",
-            &bootTimeUtc) == 0)
-    {
-        return false;
-    }
-
-    return bootTimestampSensor.setValue(timestamp);
+    return ssidPublished &&
+           ipAddressPublished &&
+           macAddressPublished &&
+           resetReasonPublished;
 }
 
 void HomeAssistantBridge::subscribeRestartCommand()
@@ -454,8 +512,12 @@ void HomeAssistantBridge::removeLegacyDiagnosticsDiscovery()
         (discoveryPrefix + "uptime/config").c_str(),
         "",
         true);
+    bool bootTimestampRemoved = mqtt.publish(
+        (discoveryPrefix + "boot_timestamp/config").c_str(),
+        "",
+        true);
 
-    if (!firmwareRemoved || !uptimeRemoved)
+    if (!firmwareRemoved || !uptimeRemoved || !bootTimestampRemoved)
     {
         Logger::warning("Failed to remove legacy diagnostics discovery");
     }

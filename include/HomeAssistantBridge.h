@@ -7,6 +7,7 @@
 #include "MQTTManager.h"
 #include "PositionTracker.h"
 #include "RemoteController.h"
+#include "WiFiManager.h"
 
 class NativePositionCover : public HACover
 {
@@ -42,6 +43,7 @@ class HomeAssistantBridge
 {
 public:
     HomeAssistantBridge(
+        WiFiManager &wifiManager,
         MQTTManager &mqttManager,
         RemoteController &remote,
         PositionTracker &position,
@@ -51,6 +53,7 @@ public:
     void update();
 
 private:
+    WiFiManager &wifiManager;
     MQTTManager &mqttManager;
     RemoteController &remote;
     PositionTracker &position;
@@ -59,8 +62,14 @@ private:
     NativePositionCover awningCover;
     HAButton savedPositionButton;
     HANumber savedPositionAssumedPercentNumber;
-    HASensor bootTimestampSensor;
+    HASensor wifiSsidSensor;
+    HASensor ipAddressSensor;
+    HASensor macAddressSensor;
     HASensorNumber wifiRssiSensor;
+    HASensorNumber freeHeapSensor;
+    HASensor resetReasonSensor;
+    HASensorNumber wifiReconnectCounterSensor;
+    HASensorNumber mqttReconnectCounterSensor;
     HAButton restartButton;
     String restartCommandTopic;
     String coverCommandTopic;
@@ -110,7 +119,7 @@ private:
     void publishCoverState();
     void publishCoverState(HACover::CoverState state, bool force = false);
     bool publishDiagnostics(bool force = false);
-    bool publishBootTimestamp();
+    bool publishStaticDiagnostics();
     void subscribeRestartCommand();
     HACover::CoverState getCoverState() const;
     void synchronizeMqttState();

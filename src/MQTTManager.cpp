@@ -96,6 +96,15 @@ void MQTTManager::update()
     {
         if (connected)
         {
+            if (hasConnected)
+            {
+                reconnectCount++;
+            }
+            else
+            {
+                hasConnected = true;
+            }
+
             Logger::info("MQTT connected");
         }
         else
@@ -116,6 +125,11 @@ bool MQTTManager::isConnected() const
 bool MQTTManager::isStarted() const
 {
     return started;
+}
+
+uint32_t MQTTManager::getReconnectCount() const
+{
+    return reconnectCount;
 }
 
 HAMqtt &MQTTManager::getMqtt()
