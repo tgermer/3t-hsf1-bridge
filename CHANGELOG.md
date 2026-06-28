@@ -1,31 +1,60 @@
-# Changelog
+Update CHANGELOG.md for the v1.1.0 release.
 
-All notable changes to this project will be documented in this file.
+Context: The project has evolved from an initial prototype into a stable Home Assistant integration.
 
-This project follows a simple versioned changelog format inspired by Keep a Changelog.
+Update the changelog using the "Keep a Changelog" format.
 
-## Unreleased
+Add a new release:
+
+## [1.1.0] - 2026-06-28
+
+Include the following sections where appropriate:
 
 ### Added
 
-- Initial project documentation.
-- HSF1 remote photos and hardware notes.
-- Runtime measurements for awning movement.
-- RF replay analysis notes.
-- Firmware architecture documentation.
-- Serial logger.
-- Remote button controller.
-- Status LED controller.
-- Runtime-based position tracker.
-- GitHub issue templates.
+- Native Home Assistant cover position support (`cover.set_cover_position`)
+- Saved position button
+- Configurable assumed saved-position percentage
+- Position persistence using ESP32 Preferences (NVS)
+- MQTT availability (online/offline)
+- MQTT reconnect state synchronization
+- Advanced Home Assistant diagnostics:
+    - WiFi RSSI
+    - WiFi SSID
+    - IP address
+    - MAC address
+    - Free heap
+    - Reset reason
+    - WiFi reconnect counter
+    - MQTT reconnect counter
+    - Restart button
+- Calibration documentation
 
 ### Changed
 
-- Project direction changed from direct CC1101 RF replay to electronically controlling the original HSF1 remote.
+- Position tracking now starts when the physical remote pulse starts.
+- Remote button presses are serialized.
+- Native cover position control replaces the legacy target-position number.
+- Saved-position tracking uses the configured assumed percentage.
+- Cover state and position synchronization were reworked for higher reliability.
+- Discovery and reconnect handling improved.
 
-### Known Limitations
+### Fixed
 
-- Hardware wiring is not tested yet.
-- HSF1 remote is not soldered yet.
-- Home Assistant integration is not implemented yet.
-- Position tracking is estimated by runtime only.
+- MQTT optimistic state race conditions.
+- STOP state/position synchronization.
+- Position publication reliability.
+- Endpoint state updates.
+- MQTT reconnect synchronization.
+- Startup state synchronization.
+- Saved-position tracking.
+- Native position command handling.
+- Diagnostics synchronization.
+
+### Removed
+
+- Legacy target-position number entity.
+- Firmware-version diagnostic entity (covered by device information).
+- Boot timestamp diagnostics.
+
+Keep previous release history intact. Do not modify anything else.
