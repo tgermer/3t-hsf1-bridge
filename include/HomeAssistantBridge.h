@@ -32,6 +32,7 @@ private:
     int lastPublishedPosition = -1;
     HACover::CoverState lastPublishedState = HACover::StateUnknown;
     unsigned long lastPositionPublishMs = 0;
+    bool lastMqttConnected = false;
     bool targetPositionActive = false;
     bool targetPositionRequiresPhysicalStop = true;
     int targetPosition = -1;
@@ -47,8 +48,9 @@ private:
     void publishPositionIfNeeded();
     void publishPosition(bool force = false);
     void publishCoverState();
-    void publishCoverState(HACover::CoverState state);
+    void publishCoverState(HACover::CoverState state, bool force = false);
     HACover::CoverState getCoverState() const;
+    void synchronizeMqttState();
     void updateTargetPositionMovement();
 
     void handleCoverCommand(HACover::CoverCommand cmd);

@@ -58,6 +58,15 @@ void HomeAssistantBridge::begin()
 
 void HomeAssistantBridge::update()
 {
+    bool mqttConnected = mqttManager.isConnected();
+
+    if (mqttConnected && !lastMqttConnected)
+    {
+        synchronizeMqttState();
+    }
+
+    lastMqttConnected = mqttConnected;
+
     updateTargetPositionMovement();
     publishPositionIfNeeded();
     publishCoverState();
@@ -98,14 +107,14 @@ void HomeAssistantBridge::publishCoverState()
     publishCoverState(getCoverState());
 }
 
-void HomeAssistantBridge::publishCoverState(HACover::CoverState state)
+void HomeAssistantBridge::publishCoverState(HACover::CoverState state, bool force)
 {
-    if (state == lastPublishedState)
+    if (!force && state == lastPublishedState)
     {
         return;
     }
 
-    if (awningCover.setState(state))
+    if (awningCover.setState(state, force))
     {
         lastPublishedState = state;
     }
@@ -137,6 +146,23 @@ HACover::CoverState HomeAssistantBridge::getCoverState() const
     }
 
     return HACover::StateStopped;
+}
+
+void HomeAssistantBridge::synchronizeMqttState()
+{
+    Logger::info("MQTT connected: synchronizing Home Assistant state");
+
+    publishPosition(true);
+    publishCoverState(getCoverState(), true);
+
+    if (targetPositionNumber.getCurrentState().isSet())
+    {
+        targetPositionNumber.setState(targetPositionNumber.getCurrentState(), true);
+    }
+    else
+    {
+        targetPositionNumber.setState(position.getPosition(), true);
+    }
 }
 
 void HomeAssistantBridge::updateTargetPositionMovement()
