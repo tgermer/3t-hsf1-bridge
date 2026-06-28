@@ -28,6 +28,8 @@ private:
     HACover awningCover;
     HAButton savedPositionButton;
     HANumber targetPositionNumber;
+    String coverPositionCommandTopic;
+    String coverDiscoveryTopic;
 
     int lastPublishedPosition = -1;
     HACover::CoverState lastPublishedState = HACover::StateUnknown;
@@ -44,6 +46,7 @@ private:
     static void onCoverCommand(HACover::CoverCommand cmd, HACover *sender);
     static void onSavedPositionCommand(HAButton *sender);
     static void onTargetPositionCommand(HANumeric number, HANumber *sender);
+    static void onMqttMessage(const char *topic, const uint8_t *payload, uint16_t length);
 
     void publishPositionIfNeeded();
     void publishPosition(bool force = false);
@@ -51,9 +54,13 @@ private:
     void publishCoverState(HACover::CoverState state, bool force = false);
     HACover::CoverState getCoverState() const;
     void synchronizeMqttState();
+    void configureNativePositionMqtt();
+    void publishCoverDiscovery();
+    void handleMqttMessage(const char *topic, const uint8_t *payload, uint16_t length);
     void updateTargetPositionMovement();
 
     void handleCoverCommand(HACover::CoverCommand cmd);
     void handleSavedPositionCommand();
     void handleTargetPositionCommand(HANumeric number);
+    void moveToTargetPosition(int requestedPosition);
 };

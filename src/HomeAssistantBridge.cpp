@@ -25,6 +25,7 @@ void HomeAssistantBridge::begin()
     Logger::info("Initializing Home Assistant bridge");
 
     instance = this;
+    configureNativePositionMqtt();
 
     awningCover.setName("Markise");
     awningCover.setDeviceClass("awning");
@@ -157,9 +158,79 @@ void HomeAssistantBridge::synchronizeMqttState()
 {
     Logger::info("MQTT connected: synchronizing Home Assistant state");
 
+    publishCoverDiscovery();
+
+    if (!mqttManager.getMqtt().subscribe(coverPositionCommandTopic.c_str()))
+    {
+        Logger::warning("Failed to subscribe to native cover position commands");
+    }
+
     publishPosition(true);
     publishCoverState(getCoverState(), true);
     targetPositionNumber.setState(constrain(position.getPosition(), 0, 100), true);
+}
+
+void HomeAssistantBridge::configureNativePositionMqtt()
+{
+    HAMqtt &mqtt = mqttManager.getMqtt();
+    const char *deviceId = mqttManager.getDevice().getUniqueId();
+
+    coverPositionCommandTopic = String(mqtt.getDataPrefix()) +
+                                "/" + deviceId +
+                                "/markise/set_position";
+    coverDiscoveryTopic = String(mqtt.getDiscoveryPrefix()) +
+                          "/cover/" + deviceId +
+                          "/markise/config";
+
+    mqtt.onMessage(onMqttMessage);
+}
+
+void HomeAssistantBridge::publishCoverDiscovery()
+{
+    HAMqtt &mqtt = mqttManager.getMqtt();
+    const char *deviceId = mqttManager.getDevice().getUniqueId();
+    String dataTopic = String(mqtt.getDataPrefix()) +
+                       "/" + deviceId +
+                       "/markise/";
+    String availabilityTopic = String(mqtt.getDataPrefix()) +
+                               "/" + deviceId +
+                               "/avty_t";
+
+    String payload;
+    payload.reserve(700);
+    payload += "{\"name\":\"Markise\",";
+    payload += "\"unique_id\":\"markise\",";
+    payload += "\"device_class\":\"awning\",";
+    payload += "\"icon\":\"mdi:awning-outline\",";
+    payload += "\"state_topic\":\"";
+    payload += dataTopic;
+    payload += "stat_t\",";
+    payload += "\"command_topic\":\"";
+    payload += dataTopic;
+    payload += "cmd_t\",";
+    payload += "\"position_topic\":\"";
+    payload += dataTopic;
+    payload += "pos_t\",";
+    payload += "\"set_position_topic\":\"";
+    payload += coverPositionCommandTopic;
+    payload += "\",";
+    payload += "\"position_open\":100,";
+    payload += "\"position_closed\":0,";
+    payload += "\"availability_topic\":\"";
+    payload += availabilityTopic;
+    payload += "\",";
+    payload += "\"device\":{\"identifiers\":[\"";
+    payload += deviceId;
+    payload += "\"],\"name\":\"";
+    payload += Config::Device::Name;
+    payload += "\",\"sw_version\":\"";
+    payload += Config::Device::Version;
+    payload += "\"}}";
+
+    if (!mqtt.publish(coverDiscoveryTopic.c_str(), payload.c_str(), true))
+    {
+        Logger::warning("Failed to publish native cover position discovery");
+    }
 }
 
 void HomeAssistantBridge::updateTargetPositionMovement()
@@ -235,6 +306,38 @@ void HomeAssistantBridge::onTargetPositionCommand(HANumeric number, HANumber *se
     }
 
     instance->handleTargetPositionCommand(number);
+}
+
+void HomeAssistantBridge::onMqttMessage(
+    const char *topic,
+    const uint8_t *payload,
+    uint16_t length)
+{
+    if (instance != nullptr)
+    {
+        instance->handleMqttMessage(topic, payload, length);
+    }
+}
+
+void HomeAssistantBridge::handleMqttMessage(
+    const char *topic,
+    const uint8_t *payload,
+    uint16_t length)
+{
+    if (strcmp(topic, coverPositionCommandTopic.c_str()) != 0)
+    {
+        return;
+    }
+
+    HANumeric number = HANumeric::fromStr(payload, length);
+
+    if (!number.isSet())
+    {
+        Logger::warning("Home Assistant command: Invalid cover target position");
+        return;
+    }
+
+    moveToTargetPosition(constrain(number.toInt16(), 0, 100));
 }
 
 void HomeAssistantBridge::handleCoverCommand(HACover::CoverCommand cmd)
@@ -319,7 +422,11 @@ void HomeAssistantBridge::handleTargetPositionCommand(HANumeric number)
         return;
     }
 
-    int requestedPosition = constrain(number.toInt16(), 0, 100);
+    moveToTargetPosition(constrain(number.toInt16(), 0, 100));
+}
+
+void HomeAssistantBridge::moveToTargetPosition(int requestedPosition)
+{
     int currentPosition = constrain(position.getPosition(), 0, 100);
 
     Logger::info(
