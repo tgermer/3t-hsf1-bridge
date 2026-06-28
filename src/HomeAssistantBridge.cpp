@@ -3,6 +3,9 @@
 #include "Config.h"
 #include "Logger.h"
 
+#include <WiFi.h>
+#include <esp_timer.h>
+
 namespace
 {
     constexpr auto PreferencesNamespace = "ha-bridge";
@@ -22,7 +25,11 @@ HomeAssistantBridge::HomeAssistantBridge(
       leds(leds),
       awningCover("markise", HACover::PositionFeature),
       savedPositionButton("markise_saved_position"),
-      savedPositionAssumedPercentNumber("markise_saved_position_assumed_percent")
+      savedPositionAssumedPercentNumber("markise_saved_position_assumed_percent"),
+      firmwareVersionSensor("firmware_version"),
+      uptimeSensor("uptime"),
+      wifiRssiSensor("wifi_rssi"),
+      restartButton("restart")
 {
 }
 
@@ -60,6 +67,35 @@ void HomeAssistantBridge::begin()
     savedPositionAssumedPercentNumber.onCommand(onSavedPositionAssumedPercentCommand);
     savedPositionAssumedPercentNumber.setState(savedPositionAssumedPercent);
 
+    firmwareVersionSensor.setName("Firmware-Version");
+    firmwareVersionSensor.setIcon("mdi:information-outline");
+
+    uptimeSensor.setName("Laufzeit");
+    uptimeSensor.setDeviceClass("duration");
+    uptimeSensor.setStateClass("total_increasing");
+    uptimeSensor.setUnitOfMeasurement("s");
+    uptimeSensor.setIcon("mdi:timer-outline");
+    uptimeSensor.setCurrentValue(static_cast<uint32_t>(
+        esp_timer_get_time() / 1000000ULL));
+
+    wifiRssiSensor.setName("WLAN-Signalstärke");
+    wifiRssiSensor.setDeviceClass("signal_strength");
+    wifiRssiSensor.setStateClass("measurement");
+    wifiRssiSensor.setUnitOfMeasurement("dBm");
+    wifiRssiSensor.setIcon("mdi:wifi");
+    wifiRssiSensor.setCurrentValue(static_cast<int32_t>(WiFi.RSSI()));
+
+    restartButton.setName("Neustart");
+    restartButton.setDeviceClass("restart");
+    restartButton.setIcon("mdi:restart");
+    restartButton.onCommand(onRestartCommand);
+
+    HAMqtt &mqtt = mqttManager.getMqtt();
+    const char *deviceId = mqttManager.getDevice().getUniqueId();
+    restartCommandTopic = String(mqtt.getDataPrefix()) +
+                          "/" + deviceId +
+                          "/restart/cmd_t";
+    mqtt.onConnected(onDiagnosticsMqttConnected);
     configureNativePositionMqtt();
     coverSetupComplete = true;
 
@@ -78,12 +114,33 @@ void HomeAssistantBridge::update()
         setupCoverMqttConnection();
     }
 
+    if (mqttConnected &&
+        restartSubscriptionPending &&
+        (lastRestartSubscriptionAttemptMs == 0 ||
+         millis() - lastRestartSubscriptionAttemptMs >= RestartSubscriptionRetryMs))
+    {
+        subscribeRestartCommand();
+    }
+
     if (mqttConnected && !lastMqttConnected)
     {
         synchronizeMqttState();
     }
 
     lastMqttConnected = mqttConnected;
+
+    unsigned long now = millis();
+    bool diagnosticsRetryDue =
+        diagnosticsPublishPending &&
+        now - lastDiagnosticsPublishAttemptMs >= DiagnosticsPublishRetryMs;
+    bool diagnosticsUpdateDue =
+        !diagnosticsPublishPending &&
+        now - lastDiagnosticsPublishMs >= DiagnosticsPublishIntervalMs;
+
+    if (mqttConnected && (diagnosticsRetryDue || diagnosticsUpdateDue))
+    {
+        publishDiagnostics(diagnosticsPublishPending);
+    }
 
     updateTargetPositionMovement();
     publishPositionIfNeeded();
@@ -159,6 +216,52 @@ void HomeAssistantBridge::publishCoverState(HACover::CoverState state, bool forc
     }
 }
 
+bool HomeAssistantBridge::publishDiagnostics(bool force)
+{
+    lastDiagnosticsPublishAttemptMs = millis();
+
+    uint32_t uptimeSeconds = static_cast<uint32_t>(
+        esp_timer_get_time() / 1000000ULL);
+    int32_t wifiRssi = WiFi.RSSI();
+
+    bool firmwarePublished = firmwareVersionSensor.setValue(Config::Device::Version);
+    bool uptimePublished = uptimeSensor.setValue(uptimeSeconds, force);
+    bool wifiRssiPublished = wifiRssiSensor.setValue(wifiRssi, force);
+
+    if (firmwarePublished && uptimePublished && wifiRssiPublished)
+    {
+        diagnosticsPublishPending = false;
+        lastDiagnosticsPublishMs = millis();
+
+        if (force)
+        {
+            Logger::info("Home Assistant diagnostics state published");
+        }
+
+        return true;
+    }
+
+    diagnosticsPublishPending = true;
+    Logger::warning("Failed to publish Home Assistant diagnostics; retry scheduled");
+    return false;
+}
+
+void HomeAssistantBridge::subscribeRestartCommand()
+{
+    lastRestartSubscriptionAttemptMs = millis();
+    restartSubscriptionPending =
+        !mqttManager.getMqtt().subscribe(restartCommandTopic.c_str());
+
+    if (restartSubscriptionPending)
+    {
+        Logger::warning("Failed to subscribe to restart commands; retry scheduled");
+    }
+    else
+    {
+        Logger::info("Home Assistant restart command subscription active");
+    }
+}
+
 HACover::CoverState HomeAssistantBridge::getCoverState() const
 {
     if (position.isMoving())
@@ -196,6 +299,7 @@ void HomeAssistantBridge::synchronizeMqttState()
     publishPosition(true);
     publishCoverState(getCoverState(), true);
     savedPositionAssumedPercentNumber.setState(savedPositionAssumedPercent, true);
+    publishDiagnostics(true);
 }
 
 void HomeAssistantBridge::configureNativePositionMqtt()
@@ -387,6 +491,26 @@ void HomeAssistantBridge::onSavedPositionAssumedPercentCommand(
     }
 
     instance->handleSavedPositionAssumedPercentCommand(number);
+}
+
+void HomeAssistantBridge::onRestartCommand(HAButton *sender)
+{
+    (void)sender;
+    Logger::info("Home Assistant command: Restart");
+    Serial.flush();
+    ESP.restart();
+}
+
+void HomeAssistantBridge::onDiagnosticsMqttConnected()
+{
+    if (instance != nullptr)
+    {
+        instance->diagnosticsPublishPending = true;
+        instance->lastDiagnosticsPublishAttemptMs =
+            millis() - DiagnosticsPublishRetryMs;
+        instance->restartSubscriptionPending = true;
+        instance->lastRestartSubscriptionAttemptMs = 0;
+    }
 }
 
 void HomeAssistantBridge::onRemoteCommandStarted(RemoteController::Command command)

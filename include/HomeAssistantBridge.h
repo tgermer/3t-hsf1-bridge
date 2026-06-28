@@ -59,6 +59,11 @@ private:
     NativePositionCover awningCover;
     HAButton savedPositionButton;
     HANumber savedPositionAssumedPercentNumber;
+    HASensor firmwareVersionSensor;
+    HASensorNumber uptimeSensor;
+    HASensorNumber wifiRssiSensor;
+    HAButton restartButton;
+    String restartCommandTopic;
     String coverCommandTopic;
     String coverPositionCommandTopic;
     String coverDiscoveryTopic;
@@ -76,16 +81,26 @@ private:
     bool preferencesReady = false;
     bool coverSetupComplete = false;
     bool coverMqttSetupPending = false;
+    bool diagnosticsPublishPending = true;
+    bool restartSubscriptionPending = true;
     unsigned long lastCoverMqttSetupAttemptMs = 0;
+    unsigned long lastDiagnosticsPublishAttemptMs = 0;
+    unsigned long lastDiagnosticsPublishMs = 0;
+    unsigned long lastRestartSubscriptionAttemptMs = 0;
 
     static constexpr unsigned long PositionPublishIntervalMs = 1000;
     static constexpr unsigned long CoverMqttSetupRetryMs = 5000;
+    static constexpr unsigned long DiagnosticsPublishRetryMs = 5000;
+    static constexpr unsigned long DiagnosticsPublishIntervalMs = 60000;
+    static constexpr unsigned long RestartSubscriptionRetryMs = 5000;
     static constexpr int TargetPositionTolerance = 1;
 
     static HomeAssistantBridge *instance;
     static void onCoverCommand(HACover::CoverCommand cmd, HACover *sender);
     static void onSavedPositionCommand(HAButton *sender);
     static void onSavedPositionAssumedPercentCommand(HANumeric number, HANumber *sender);
+    static void onRestartCommand(HAButton *sender);
+    static void onDiagnosticsMqttConnected();
     static void onRemoteCommandStarted(RemoteController::Command command);
     static void onCoverMqttConnected();
     static void onMqttMessage(const char *topic, const uint8_t *payload, uint16_t length);
@@ -95,6 +110,8 @@ private:
     void publishFinalPosition();
     void publishCoverState();
     void publishCoverState(HACover::CoverState state, bool force = false);
+    bool publishDiagnostics(bool force = false);
+    void subscribeRestartCommand();
     HACover::CoverState getCoverState() const;
     void synchronizeMqttState();
     void configureNativePositionMqtt();
