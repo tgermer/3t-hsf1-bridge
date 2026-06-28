@@ -59,8 +59,7 @@ private:
     NativePositionCover awningCover;
     HAButton savedPositionButton;
     HANumber savedPositionAssumedPercentNumber;
-    HASensor firmwareVersionSensor;
-    HASensorNumber uptimeSensor;
+    HASensor bootTimestampSensor;
     HASensorNumber wifiRssiSensor;
     HAButton restartButton;
     String restartCommandTopic;
@@ -111,6 +110,7 @@ private:
     void publishCoverState();
     void publishCoverState(HACover::CoverState state, bool force = false);
     bool publishDiagnostics(bool force = false);
+    bool publishBootTimestamp();
     void subscribeRestartCommand();
     HACover::CoverState getCoverState() const;
     void synchronizeMqttState();
@@ -118,6 +118,7 @@ private:
     void setupCoverMqttConnection();
     bool publishCoverDiscovery();
     void removeLegacyTargetPositionDiscovery();
+    void removeLegacyDiagnosticsDiscovery();
     void handleMqttMessage(const char *topic, const uint8_t *payload, uint16_t length);
     void updateTargetPositionMovement();
 

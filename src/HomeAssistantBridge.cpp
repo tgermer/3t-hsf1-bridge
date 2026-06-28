@@ -4,12 +4,13 @@
 #include "Logger.h"
 
 #include <WiFi.h>
-#include <esp_timer.h>
+#include <time.h>
 
 namespace
 {
     constexpr auto PreferencesNamespace = "ha-bridge";
     constexpr auto SavedPositionPercentKey = "savedPercent";
+    constexpr time_t MinimumValidEpoch = 1609459200; // 2021-01-01T00:00:00Z
 }
 
 HomeAssistantBridge *HomeAssistantBridge::instance = nullptr;
@@ -26,8 +27,7 @@ HomeAssistantBridge::HomeAssistantBridge(
       awningCover("markise", HACover::PositionFeature),
       savedPositionButton("markise_saved_position"),
       savedPositionAssumedPercentNumber("markise_saved_position_assumed_percent"),
-      firmwareVersionSensor("firmware_version"),
-      uptimeSensor("uptime"),
+      bootTimestampSensor("boot_timestamp"),
       wifiRssiSensor("wifi_rssi"),
       restartButton("restart")
 {
@@ -67,16 +67,9 @@ void HomeAssistantBridge::begin()
     savedPositionAssumedPercentNumber.onCommand(onSavedPositionAssumedPercentCommand);
     savedPositionAssumedPercentNumber.setState(savedPositionAssumedPercent);
 
-    firmwareVersionSensor.setName("Firmware-Version");
-    firmwareVersionSensor.setIcon("mdi:information-outline");
-
-    uptimeSensor.setName("Laufzeit");
-    uptimeSensor.setDeviceClass("duration");
-    uptimeSensor.setStateClass("total_increasing");
-    uptimeSensor.setUnitOfMeasurement("s");
-    uptimeSensor.setIcon("mdi:timer-outline");
-    uptimeSensor.setCurrentValue(static_cast<uint32_t>(
-        esp_timer_get_time() / 1000000ULL));
+    bootTimestampSensor.setName("Gestartet um");
+    bootTimestampSensor.setDeviceClass("timestamp");
+    bootTimestampSensor.setIcon("mdi:clock-start");
 
     wifiRssiSensor.setName("WLAN-Signalstärke");
     wifiRssiSensor.setDeviceClass("signal_strength");
@@ -220,15 +213,12 @@ bool HomeAssistantBridge::publishDiagnostics(bool force)
 {
     lastDiagnosticsPublishAttemptMs = millis();
 
-    uint32_t uptimeSeconds = static_cast<uint32_t>(
-        esp_timer_get_time() / 1000000ULL);
     int32_t wifiRssi = WiFi.RSSI();
 
-    bool firmwarePublished = firmwareVersionSensor.setValue(Config::Device::Version);
-    bool uptimePublished = uptimeSensor.setValue(uptimeSeconds, force);
     bool wifiRssiPublished = wifiRssiSensor.setValue(wifiRssi, force);
+    bool bootTimestampPublished = publishBootTimestamp();
 
-    if (firmwarePublished && uptimePublished && wifiRssiPublished)
+    if (wifiRssiPublished && bootTimestampPublished)
     {
         diagnosticsPublishPending = false;
         lastDiagnosticsPublishMs = millis();
@@ -244,6 +234,39 @@ bool HomeAssistantBridge::publishDiagnostics(bool force)
     diagnosticsPublishPending = true;
     Logger::warning("Failed to publish Home Assistant diagnostics; retry scheduled");
     return false;
+}
+
+bool HomeAssistantBridge::publishBootTimestamp()
+{
+    time_t currentTime = time(nullptr);
+
+    if (currentTime < MinimumValidEpoch)
+    {
+        // No reliable wall-clock source is configured. Clear any retained value
+        // from an earlier boot so Home Assistant keeps the entity unknown.
+        return bootTimestampSensor.setValue(nullptr);
+    }
+
+    time_t bootTime = currentTime - static_cast<time_t>(millis() / 1000UL);
+    struct tm bootTimeUtc;
+
+    if (gmtime_r(&bootTime, &bootTimeUtc) == nullptr)
+    {
+        return false;
+    }
+
+    char timestamp[21];
+
+    if (strftime(
+            timestamp,
+            sizeof(timestamp),
+            "%Y-%m-%dT%H:%M:%SZ",
+            &bootTimeUtc) == 0)
+    {
+        return false;
+    }
+
+    return bootTimestampSensor.setValue(timestamp);
 }
 
 void HomeAssistantBridge::subscribeRestartCommand()
@@ -295,6 +318,7 @@ void HomeAssistantBridge::synchronizeMqttState()
     Logger::info("MQTT connected: synchronizing Home Assistant state");
 
     removeLegacyTargetPositionDiscovery();
+    removeLegacyDiagnosticsDiscovery();
 
     publishPosition(true);
     publishCoverState(getCoverState(), true);
@@ -412,6 +436,28 @@ void HomeAssistantBridge::removeLegacyTargetPositionDiscovery()
     if (!mqtt.publish(discoveryTopic.c_str(), "", true))
     {
         Logger::warning("Failed to remove legacy target-position discovery");
+    }
+}
+
+void HomeAssistantBridge::removeLegacyDiagnosticsDiscovery()
+{
+    HAMqtt &mqtt = mqttManager.getMqtt();
+    const char *deviceId = mqttManager.getDevice().getUniqueId();
+    String discoveryPrefix = String(mqtt.getDiscoveryPrefix()) +
+                             "/sensor/" + deviceId + "/";
+
+    bool firmwareRemoved = mqtt.publish(
+        (discoveryPrefix + "firmware_version/config").c_str(),
+        "",
+        true);
+    bool uptimeRemoved = mqtt.publish(
+        (discoveryPrefix + "uptime/config").c_str(),
+        "",
+        true);
+
+    if (!firmwareRemoved || !uptimeRemoved)
+    {
+        Logger::warning("Failed to remove legacy diagnostics discovery");
     }
 }
 
