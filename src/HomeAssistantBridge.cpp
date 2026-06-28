@@ -82,7 +82,7 @@ void HomeAssistantBridge::publishPositionIfNeeded()
     publishPosition();
 }
 
-void HomeAssistantBridge::publishPosition(bool force)
+bool HomeAssistantBridge::publishPosition(bool force)
 {
     int currentPosition = constrain(position.getPosition(), 0, 100);
 
@@ -90,6 +90,27 @@ void HomeAssistantBridge::publishPosition(bool force)
     {
         lastPublishedPosition = currentPosition;
         lastPositionPublishMs = millis();
+        return true;
+    }
+
+    return false;
+}
+
+void HomeAssistantBridge::publishFinalPosition()
+{
+    int currentPosition = constrain(position.getPosition(), 0, 100);
+
+    if (publishPosition(true))
+    {
+        Logger::info("Final cover position published: " + String(currentPosition) + "%");
+    }
+    else
+    {
+        lastPublishedPosition = -1;
+        Logger::warning(
+            "Failed to publish final cover position " +
+            String(currentPosition) +
+            "%; retry scheduled");
     }
 }
 
@@ -269,7 +290,7 @@ void HomeAssistantBridge::updateTargetPositionMovement()
 
     targetPositionActive = false;
 
-    publishPosition(true);
+    publishFinalPosition();
     publishCoverState();
 }
 
@@ -361,7 +382,7 @@ void HomeAssistantBridge::handleCoverCommand(HACover::CoverCommand cmd)
         leds.flashSend();
         remote.pressStop();
 
-        publishPosition(true);
+        publishFinalPosition();
         publishCoverState();
     }
 }
@@ -375,7 +396,7 @@ void HomeAssistantBridge::handleSavedPositionCommand()
 
     if (abs(currentPosition - Config::Awning::SavedPositionPercent) <= TargetPositionTolerance)
     {
-        publishPosition(true);
+        publishFinalPosition();
         publishCoverState();
         return;
     }
@@ -421,7 +442,7 @@ void HomeAssistantBridge::moveToTargetPosition(int requestedPosition)
             position.stop();
         }
 
-        publishPosition(true);
+        publishFinalPosition();
         publishCoverState();
         return;
     }

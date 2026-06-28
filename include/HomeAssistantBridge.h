@@ -47,7 +47,8 @@ private:
     static void onMqttMessage(const char *topic, const uint8_t *payload, uint16_t length);
 
     void publishPositionIfNeeded();
-    void publishPosition(bool force = false);
+    bool publishPosition(bool force = false);
+    void publishFinalPosition();
     void publishCoverState();
     void publishCoverState(HACover::CoverState state, bool force = false);
     HACover::CoverState getCoverState() const;
