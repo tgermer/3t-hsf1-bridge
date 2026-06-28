@@ -31,7 +31,6 @@ void HomeAssistantBridge::begin()
     Logger::info("Initializing Home Assistant bridge");
 
     instance = this;
-    configureNativePositionMqtt();
     loadSavedPositionAssumedPercent();
     remote.onCommandStarted(onRemoteCommandStarted);
 
@@ -61,12 +60,23 @@ void HomeAssistantBridge::begin()
     savedPositionAssumedPercentNumber.onCommand(onSavedPositionAssumedPercentCommand);
     savedPositionAssumedPercentNumber.setState(savedPositionAssumedPercent);
 
-    Logger::info("Home Assistant cover registered");
+    configureNativePositionMqtt();
+    coverSetupComplete = true;
+
+    Logger::info(
+        "Home Assistant cover setup complete: native position support enabled");
 }
 
 void HomeAssistantBridge::update()
 {
     bool mqttConnected = mqttManager.isConnected();
+
+    if (mqttConnected &&
+        coverMqttSetupPending &&
+        millis() - lastCoverMqttSetupAttemptMs >= CoverMqttSetupRetryMs)
+    {
+        setupCoverMqttConnection();
+    }
 
     if (mqttConnected && !lastMqttConnected)
     {
@@ -182,12 +192,6 @@ void HomeAssistantBridge::synchronizeMqttState()
     Logger::info("MQTT connected: synchronizing Home Assistant state");
 
     removeLegacyTargetPositionDiscovery();
-    publishCoverDiscovery();
-
-    if (!mqttManager.getMqtt().subscribe(coverPositionCommandTopic.c_str()))
-    {
-        Logger::warning("Failed to subscribe to native cover position commands");
-    }
 
     publishPosition(true);
     publishCoverState(getCoverState(), true);
@@ -199,6 +203,9 @@ void HomeAssistantBridge::configureNativePositionMqtt()
     HAMqtt &mqtt = mqttManager.getMqtt();
     const char *deviceId = mqttManager.getDevice().getUniqueId();
 
+    coverCommandTopic = String(mqtt.getDataPrefix()) +
+                        "/" + deviceId +
+                        "/markise/cmd_t";
     coverPositionCommandTopic = String(mqtt.getDataPrefix()) +
                                 "/" + deviceId +
                                 "/markise/set_position";
@@ -207,9 +214,45 @@ void HomeAssistantBridge::configureNativePositionMqtt()
                           "/markise/config";
 
     mqtt.onMessage(onMqttMessage);
+    awningCover.setMqttConnectedCallback(onCoverMqttConnected);
 }
 
-void HomeAssistantBridge::publishCoverDiscovery()
+void HomeAssistantBridge::setupCoverMqttConnection()
+{
+    lastCoverMqttSetupAttemptMs = millis();
+
+    if (!coverSetupComplete)
+    {
+        coverMqttSetupPending = true;
+        Logger::warning("Cover MQTT setup deferred until cover configuration is complete");
+        return;
+    }
+
+    HAMqtt &mqtt = mqttManager.getMqtt();
+    bool commandSubscribed = mqtt.subscribe(coverCommandTopic.c_str());
+    bool positionCommandSubscribed = mqtt.subscribe(coverPositionCommandTopic.c_str());
+    bool discoveryPublished =
+        commandSubscribed &&
+        positionCommandSubscribed &&
+        publishCoverDiscovery();
+
+    coverMqttSetupPending =
+        !discoveryPublished ||
+        !commandSubscribed ||
+        !positionCommandSubscribed;
+
+    if (coverMqttSetupPending)
+    {
+        Logger::warning(
+            "Cover MQTT setup incomplete; native position discovery retry scheduled");
+        return;
+    }
+
+    Logger::info(
+        "Cover MQTT discovery published: native position support enabled");
+}
+
+bool HomeAssistantBridge::publishCoverDiscovery()
 {
     HAMqtt &mqtt = mqttManager.getMqtt();
     const char *deviceId = mqttManager.getDevice().getUniqueId();
@@ -251,10 +294,7 @@ void HomeAssistantBridge::publishCoverDiscovery()
     payload += Config::Device::Version;
     payload += "\"}}";
 
-    if (!mqtt.publish(coverDiscoveryTopic.c_str(), payload.c_str(), true))
-    {
-        Logger::warning("Failed to publish native cover position discovery");
-    }
+    return mqtt.publish(coverDiscoveryTopic.c_str(), payload.c_str(), true);
 }
 
 void HomeAssistantBridge::removeLegacyTargetPositionDiscovery()
@@ -354,6 +394,14 @@ void HomeAssistantBridge::onRemoteCommandStarted(RemoteController::Command comma
     if (instance != nullptr)
     {
         instance->handleRemoteCommandStarted(command);
+    }
+}
+
+void HomeAssistantBridge::onCoverMqttConnected()
+{
+    if (instance != nullptr)
+    {
+        instance->setupCoverMqttConnection();
     }
 }
 
