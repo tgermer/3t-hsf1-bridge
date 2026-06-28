@@ -27,7 +27,6 @@ private:
 
     HACover awningCover;
     HAButton savedPositionButton;
-    HANumber targetPositionNumber;
     String coverPositionCommandTopic;
     String coverDiscoveryTopic;
 
@@ -45,7 +44,6 @@ private:
     static HomeAssistantBridge *instance;
     static void onCoverCommand(HACover::CoverCommand cmd, HACover *sender);
     static void onSavedPositionCommand(HAButton *sender);
-    static void onTargetPositionCommand(HANumeric number, HANumber *sender);
     static void onMqttMessage(const char *topic, const uint8_t *payload, uint16_t length);
 
     void publishPositionIfNeeded();
@@ -56,11 +54,11 @@ private:
     void synchronizeMqttState();
     void configureNativePositionMqtt();
     void publishCoverDiscovery();
+    void removeLegacyTargetPositionDiscovery();
     void handleMqttMessage(const char *topic, const uint8_t *payload, uint16_t length);
     void updateTargetPositionMovement();
 
     void handleCoverCommand(HACover::CoverCommand cmd);
     void handleSavedPositionCommand();
-    void handleTargetPositionCommand(HANumeric number);
     void moveToTargetPosition(int requestedPosition);
 };

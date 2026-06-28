@@ -15,8 +15,7 @@ HomeAssistantBridge::HomeAssistantBridge(
       position(position),
       leds(leds),
       awningCover("markise", HACover::PositionFeature),
-      savedPositionButton("markise_saved_position"),
-      targetPositionNumber("markise_target_position")
+      savedPositionButton("markise_saved_position")
 {
 }
 
@@ -44,15 +43,6 @@ void HomeAssistantBridge::begin()
     savedPositionButton.setName("Gespeicherte Position");
     savedPositionButton.setIcon("mdi:star-outline");
     savedPositionButton.onCommand(onSavedPositionCommand);
-
-    targetPositionNumber.setName("Zielposition");
-    targetPositionNumber.setIcon("mdi:arrow-expand-vertical");
-    targetPositionNumber.setMin(0);
-    targetPositionNumber.setMax(100);
-    targetPositionNumber.setStep(1);
-    targetPositionNumber.setMode(HANumber::ModeSlider);
-    targetPositionNumber.onCommand(onTargetPositionCommand);
-    targetPositionNumber.setState(position.getPosition());
 
     Logger::info("Home Assistant cover registered");
 }
@@ -118,11 +108,6 @@ void HomeAssistantBridge::publishCoverState(HACover::CoverState state, bool forc
     if (awningCover.setState(state, force))
     {
         lastPublishedState = state;
-
-        if (state == HACover::StateClosed || state == HACover::StateOpen)
-        {
-            targetPositionNumber.setState(constrain(position.getPosition(), 0, 100), true);
-        }
     }
 }
 
@@ -158,6 +143,7 @@ void HomeAssistantBridge::synchronizeMqttState()
 {
     Logger::info("MQTT connected: synchronizing Home Assistant state");
 
+    removeLegacyTargetPositionDiscovery();
     publishCoverDiscovery();
 
     if (!mqttManager.getMqtt().subscribe(coverPositionCommandTopic.c_str()))
@@ -167,7 +153,6 @@ void HomeAssistantBridge::synchronizeMqttState()
 
     publishPosition(true);
     publishCoverState(getCoverState(), true);
-    targetPositionNumber.setState(constrain(position.getPosition(), 0, 100), true);
 }
 
 void HomeAssistantBridge::configureNativePositionMqtt()
@@ -233,6 +218,20 @@ void HomeAssistantBridge::publishCoverDiscovery()
     }
 }
 
+void HomeAssistantBridge::removeLegacyTargetPositionDiscovery()
+{
+    HAMqtt &mqtt = mqttManager.getMqtt();
+    const char *deviceId = mqttManager.getDevice().getUniqueId();
+    String discoveryTopic = String(mqtt.getDiscoveryPrefix()) +
+                            "/number/" + deviceId +
+                            "/markise_target_position/config";
+
+    if (!mqtt.publish(discoveryTopic.c_str(), "", true))
+    {
+        Logger::warning("Failed to remove legacy target-position discovery");
+    }
+}
+
 void HomeAssistantBridge::updateTargetPositionMovement()
 {
     if (!targetPositionActive)
@@ -272,7 +271,6 @@ void HomeAssistantBridge::updateTargetPositionMovement()
 
     publishPosition(true);
     publishCoverState();
-    targetPositionNumber.setState(constrain(position.getPosition(), 0, 100), true);
 }
 
 void HomeAssistantBridge::onCoverCommand(HACover::CoverCommand cmd, HACover *sender)
@@ -295,17 +293,6 @@ void HomeAssistantBridge::onSavedPositionCommand(HAButton *sender)
     }
 
     instance->handleSavedPositionCommand();
-}
-
-void HomeAssistantBridge::onTargetPositionCommand(HANumeric number, HANumber *sender)
-{
-    if (instance == nullptr)
-    {
-        Logger::error("HomeAssistantBridge instance is null");
-        return;
-    }
-
-    instance->handleTargetPositionCommand(number);
 }
 
 void HomeAssistantBridge::onMqttMessage(
@@ -376,7 +363,6 @@ void HomeAssistantBridge::handleCoverCommand(HACover::CoverCommand cmd)
 
         publishPosition(true);
         publishCoverState();
-        targetPositionNumber.setState(constrain(position.getPosition(), 0, 100), true);
     }
 }
 
@@ -391,7 +377,6 @@ void HomeAssistantBridge::handleSavedPositionCommand()
     {
         publishPosition(true);
         publishCoverState();
-        targetPositionNumber.setState(constrain(position.getPosition(), 0, 100), true);
         return;
     }
 
@@ -414,17 +399,6 @@ void HomeAssistantBridge::handleSavedPositionCommand()
     publishCoverState();
 }
 
-void HomeAssistantBridge::handleTargetPositionCommand(HANumeric number)
-{
-    if (!number.isSet())
-    {
-        Logger::warning("Home Assistant command: Target position reset ignored");
-        return;
-    }
-
-    moveToTargetPosition(constrain(number.toInt16(), 0, 100));
-}
-
 void HomeAssistantBridge::moveToTargetPosition(int requestedPosition)
 {
     int currentPosition = constrain(position.getPosition(), 0, 100);
@@ -435,8 +409,6 @@ void HomeAssistantBridge::moveToTargetPosition(int requestedPosition)
         "% from " +
         String(currentPosition) +
         "%");
-
-    targetPositionNumber.setState(requestedPosition);
 
     if (abs(currentPosition - requestedPosition) <= TargetPositionTolerance)
     {
@@ -451,7 +423,6 @@ void HomeAssistantBridge::moveToTargetPosition(int requestedPosition)
 
         publishPosition(true);
         publishCoverState();
-        targetPositionNumber.setState(constrain(position.getPosition(), 0, 100), true);
         return;
     }
 
