@@ -117,6 +117,11 @@ void HomeAssistantBridge::publishCoverState(HACover::CoverState state, bool forc
     if (awningCover.setState(state, force))
     {
         lastPublishedState = state;
+
+        if (state == HACover::StateClosed || state == HACover::StateOpen)
+        {
+            targetPositionNumber.setState(constrain(position.getPosition(), 0, 100), true);
+        }
     }
 }
 
@@ -154,15 +159,7 @@ void HomeAssistantBridge::synchronizeMqttState()
 
     publishPosition(true);
     publishCoverState(getCoverState(), true);
-
-    if (targetPositionNumber.getCurrentState().isSet())
-    {
-        targetPositionNumber.setState(targetPositionNumber.getCurrentState(), true);
-    }
-    else
-    {
-        targetPositionNumber.setState(position.getPosition(), true);
-    }
+    targetPositionNumber.setState(constrain(position.getPosition(), 0, 100), true);
 }
 
 void HomeAssistantBridge::updateTargetPositionMovement()
@@ -204,7 +201,7 @@ void HomeAssistantBridge::updateTargetPositionMovement()
 
     publishPosition(true);
     publishCoverState();
-    targetPositionNumber.setState(targetPosition);
+    targetPositionNumber.setState(constrain(position.getPosition(), 0, 100), true);
 }
 
 void HomeAssistantBridge::onCoverCommand(HACover::CoverCommand cmd, HACover *sender)
@@ -276,6 +273,7 @@ void HomeAssistantBridge::handleCoverCommand(HACover::CoverCommand cmd)
 
         publishPosition(true);
         publishCoverState();
+        targetPositionNumber.setState(constrain(position.getPosition(), 0, 100), true);
     }
 }
 
@@ -290,6 +288,7 @@ void HomeAssistantBridge::handleSavedPositionCommand()
     {
         publishPosition(true);
         publishCoverState();
+        targetPositionNumber.setState(constrain(position.getPosition(), 0, 100), true);
         return;
     }
 
@@ -345,6 +344,7 @@ void HomeAssistantBridge::handleTargetPositionCommand(HANumeric number)
 
         publishPosition(true);
         publishCoverState();
+        targetPositionNumber.setState(constrain(position.getPosition(), 0, 100), true);
         return;
     }
 
