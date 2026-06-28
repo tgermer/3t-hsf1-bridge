@@ -29,6 +29,15 @@ void MQTTManager::begin()
 
     device.setName(Config::Device::Name);
     device.setSoftwareVersion(Config::Device::Version);
+
+    if (device.enableSharedAvailability())
+    {
+        device.enableLastWill();
+    }
+    else
+    {
+        Logger::error("Failed to enable shared MQTT availability");
+    }
 }
 
 void MQTTManager::connect()
