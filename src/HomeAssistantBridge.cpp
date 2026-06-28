@@ -1,5 +1,6 @@
 #include "HomeAssistantBridge.h"
 
+#include "Config.h"
 #include "Logger.h"
 
 HomeAssistantBridge *HomeAssistantBridge::instance = nullptr;
@@ -165,8 +166,12 @@ void HomeAssistantBridge::updateTargetPositionMovement()
 
     Logger::info("Target position reached: " + String(targetPosition) + "%");
 
-    leds.flashSend();
-    remote.pressStop();
+    if (targetPositionRequiresPhysicalStop)
+    {
+        leds.flashSend();
+        remote.pressStop();
+    }
+
     position.stop();
 
     targetPositionActive = false;
@@ -253,10 +258,32 @@ void HomeAssistantBridge::handleSavedPositionCommand()
     Logger::info("Home Assistant command: Saved position");
     targetPositionActive = false;
 
+    int currentPosition = constrain(position.getPosition(), 0, 100);
+
+    if (abs(currentPosition - Config::Awning::SavedPositionPercent) <= TargetPositionTolerance)
+    {
+        publishPosition(true);
+        publishCoverState();
+        return;
+    }
+
     leds.flashSend();
     remote.pressFavoritePosition();
 
-    publishCoverState(HACover::StateStopped);
+    targetPosition = Config::Awning::SavedPositionPercent;
+    targetPositionRequiresPhysicalStop = false;
+    targetPositionActive = true;
+
+    if (currentPosition < Config::Awning::SavedPositionPercent)
+    {
+        position.startOpening();
+    }
+    else
+    {
+        position.startClosing();
+    }
+
+    publishCoverState();
 }
 
 void HomeAssistantBridge::handleTargetPositionCommand(HANumeric number)
@@ -298,6 +325,7 @@ void HomeAssistantBridge::handleTargetPositionCommand(HANumeric number)
     leds.flashSend();
 
     targetPosition = requestedPosition;
+    targetPositionRequiresPhysicalStop = true;
     targetPositionActive = true;
 
     if (requestedPosition > currentPosition)

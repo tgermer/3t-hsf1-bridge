@@ -35,5 +35,6 @@ namespace Config
     {
         constexpr uint32_t OpenTimeMs = 26300;
         constexpr uint32_t CloseTimeMs = 27000;
+        constexpr int SavedPositionPercent = 70;
     }
 }

@@ -33,6 +33,7 @@ private:
     HACover::CoverState lastPublishedState = HACover::StateUnknown;
     unsigned long lastPositionPublishMs = 0;
     bool targetPositionActive = false;
+    bool targetPositionRequiresPhysicalStop = true;
     int targetPosition = -1;
 
     static constexpr unsigned long PositionPublishIntervalMs = 1000;
