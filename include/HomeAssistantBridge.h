@@ -1,6 +1,7 @@
 #pragma once
 
 #include <ArduinoHA.h>
+#include <Preferences.h>
 
 #include "LedController.h"
 #include "MQTTManager.h"
@@ -27,8 +28,10 @@ private:
 
     HACover awningCover;
     HAButton savedPositionButton;
+    HANumber savedPositionAssumedPercentNumber;
     String coverPositionCommandTopic;
     String coverDiscoveryTopic;
+    Preferences preferences;
 
     int lastPublishedPosition = -1;
     HACover::CoverState lastPublishedState = HACover::StateUnknown;
@@ -37,6 +40,8 @@ private:
     bool targetPositionActive = false;
     bool targetPositionRequiresPhysicalStop = true;
     int targetPosition = -1;
+    int savedPositionAssumedPercent = 0;
+    bool preferencesReady = false;
 
     static constexpr unsigned long PositionPublishIntervalMs = 1000;
     static constexpr int TargetPositionTolerance = 1;
@@ -44,6 +49,7 @@ private:
     static HomeAssistantBridge *instance;
     static void onCoverCommand(HACover::CoverCommand cmd, HACover *sender);
     static void onSavedPositionCommand(HAButton *sender);
+    static void onSavedPositionAssumedPercentCommand(HANumeric number, HANumber *sender);
     static void onMqttMessage(const char *topic, const uint8_t *payload, uint16_t length);
 
     void publishPositionIfNeeded();
@@ -61,5 +67,7 @@ private:
 
     void handleCoverCommand(HACover::CoverCommand cmd);
     void handleSavedPositionCommand();
+    void handleSavedPositionAssumedPercentCommand(HANumeric number);
+    void loadSavedPositionAssumedPercent();
     void moveToTargetPosition(int requestedPosition);
 };

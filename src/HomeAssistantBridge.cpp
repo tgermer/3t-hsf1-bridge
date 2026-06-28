@@ -3,6 +3,12 @@
 #include "Config.h"
 #include "Logger.h"
 
+namespace
+{
+    constexpr auto PreferencesNamespace = "ha-bridge";
+    constexpr auto SavedPositionPercentKey = "savedPercent";
+}
+
 HomeAssistantBridge *HomeAssistantBridge::instance = nullptr;
 
 HomeAssistantBridge::HomeAssistantBridge(
@@ -15,7 +21,8 @@ HomeAssistantBridge::HomeAssistantBridge(
       position(position),
       leds(leds),
       awningCover("markise", HACover::PositionFeature),
-      savedPositionButton("markise_saved_position")
+      savedPositionButton("markise_saved_position"),
+      savedPositionAssumedPercentNumber("markise_saved_position_assumed_percent")
 {
 }
 
@@ -25,6 +32,7 @@ void HomeAssistantBridge::begin()
 
     instance = this;
     configureNativePositionMqtt();
+    loadSavedPositionAssumedPercent();
 
     awningCover.setName("Markise");
     awningCover.setDeviceClass("awning");
@@ -43,6 +51,14 @@ void HomeAssistantBridge::begin()
     savedPositionButton.setName("Gespeicherte Position");
     savedPositionButton.setIcon("mdi:star-outline");
     savedPositionButton.onCommand(onSavedPositionCommand);
+
+    savedPositionAssumedPercentNumber.setName("Angenommene gespeicherte Position");
+    savedPositionAssumedPercentNumber.setMin(0);
+    savedPositionAssumedPercentNumber.setMax(100);
+    savedPositionAssumedPercentNumber.setStep(1);
+    savedPositionAssumedPercentNumber.setMode(HANumber::ModeSlider);
+    savedPositionAssumedPercentNumber.onCommand(onSavedPositionAssumedPercentCommand);
+    savedPositionAssumedPercentNumber.setState(savedPositionAssumedPercent);
 
     Logger::info("Home Assistant cover registered");
 }
@@ -174,6 +190,7 @@ void HomeAssistantBridge::synchronizeMqttState()
 
     publishPosition(true);
     publishCoverState(getCoverState(), true);
+    savedPositionAssumedPercentNumber.setState(savedPositionAssumedPercent, true);
 }
 
 void HomeAssistantBridge::configureNativePositionMqtt()
@@ -316,6 +333,19 @@ void HomeAssistantBridge::onSavedPositionCommand(HAButton *sender)
     instance->handleSavedPositionCommand();
 }
 
+void HomeAssistantBridge::onSavedPositionAssumedPercentCommand(
+    HANumeric number,
+    HANumber *sender)
+{
+    if (instance == nullptr)
+    {
+        Logger::error("HomeAssistantBridge instance is null");
+        return;
+    }
+
+    instance->handleSavedPositionAssumedPercentCommand(number);
+}
+
 void HomeAssistantBridge::onMqttMessage(
     const char *topic,
     const uint8_t *payload,
@@ -393,8 +423,9 @@ void HomeAssistantBridge::handleSavedPositionCommand()
     targetPositionActive = false;
 
     int currentPosition = constrain(position.getPosition(), 0, 100);
+    int assumedPosition = savedPositionAssumedPercent;
 
-    if (abs(currentPosition - Config::Awning::SavedPositionPercent) <= TargetPositionTolerance)
+    if (abs(currentPosition - assumedPosition) <= TargetPositionTolerance)
     {
         publishFinalPosition();
         publishCoverState();
@@ -404,11 +435,11 @@ void HomeAssistantBridge::handleSavedPositionCommand()
     leds.flashSend();
     remote.pressFavoritePosition();
 
-    targetPosition = Config::Awning::SavedPositionPercent;
+    targetPosition = assumedPosition;
     targetPositionRequiresPhysicalStop = false;
     targetPositionActive = true;
 
-    if (currentPosition < Config::Awning::SavedPositionPercent)
+    if (currentPosition < assumedPosition)
     {
         position.startOpening();
     }
@@ -418,6 +449,61 @@ void HomeAssistantBridge::handleSavedPositionCommand()
     }
 
     publishCoverState();
+}
+
+void HomeAssistantBridge::handleSavedPositionAssumedPercentCommand(HANumeric number)
+{
+    if (!number.isSet())
+    {
+        Logger::warning("Home Assistant command: Invalid assumed saved position");
+        return;
+    }
+
+    int requestedPosition = constrain(number.toInt16(), 0, 100);
+
+    // This value only changes the firmware estimate; it does not program the motor favorite position.
+    if (requestedPosition != savedPositionAssumedPercent)
+    {
+        savedPositionAssumedPercent = requestedPosition;
+
+        if (preferencesReady &&
+            preferences.putInt(SavedPositionPercentKey, savedPositionAssumedPercent) != sizeof(int))
+        {
+            Logger::warning("Failed to persist assumed saved position");
+        }
+
+        Logger::info(
+            "Assumed saved position set to " +
+            String(savedPositionAssumedPercent) +
+            "%");
+    }
+
+    savedPositionAssumedPercentNumber.setState(savedPositionAssumedPercent, true);
+}
+
+void HomeAssistantBridge::loadSavedPositionAssumedPercent()
+{
+    savedPositionAssumedPercent = Config::Awning::SavedPositionPercent;
+    preferencesReady = preferences.begin(PreferencesNamespace, false);
+
+    if (!preferencesReady)
+    {
+        Logger::warning("Assumed saved-position persistence unavailable");
+        return;
+    }
+
+    int storedPosition = preferences.getInt(
+        SavedPositionPercentKey,
+        Config::Awning::SavedPositionPercent);
+
+    if (storedPosition >= 0 && storedPosition <= 100)
+    {
+        savedPositionAssumedPercent = storedPosition;
+    }
+    else
+    {
+        Logger::warning("Stored assumed saved position is invalid; using default");
+    }
 }
 
 void HomeAssistantBridge::moveToTargetPosition(int requestedPosition)
